@@ -1,0 +1,157 @@
+---
+title: "Run_models_AfSIS"
+output: html_document
+date: "2025-07-22"
+authors: "Soil-climate feedback across sub-Saharan Africa Workshop Participants"
+---
+
+#Load libraries needed to run MIMICS and Millennial
+```{r}
+library(FME)
+library(here)
+library(dplyr) 
+library(tidyr)
+library(ggplot2)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(viridis)
+library(DT)
+library(purrr)
+library(Metrics)
+
+safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
+                             "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888",
+                             "#E69F00", "#D55E00")
+
+#load mimics model components
+source(here("ODEs/RXEQ.R"))
+source(here("parameters/MIMICS_parameters_sandbox_20231129.R"))
+source(here("functions/calc_Tpars.R"))
+source(here("functions/MIMICS_calc_steady_state_pools.R"))
+
+#load millennial model components
+source(here("functions/run_functions.R")) #R script that contains calls to run model
+source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
+```
+
+#Load forcing data
+```{r}
+##load forcing data
+forcing_data <- read.csv("forcing_data/afsis_ref_updated6.csv", as.is=T)
+forcing_data<- forcing_data[,-1]
+colnames(forcing_data)[1] <- "Set"  # Fix for first column name import error
+
+#match MIMICS names
+forcing_data_MIMICS <- forcing_data %>% select(Set, ANPP = Litterfall.gC.m2.yr, 
+                                               CLAY = Clay_2um,
+                                               lig_N = LIG_N,
+                                               TSOI = SoilTMP_C,
+                                               theta_liq = SoilMoi_m3m3,
+                                               Depth = Depth) %>% 
+  drop_na(ANPP, CLAY, lig_N, TSOI, theta_liq)  %>% 
+  filter(Depth=='Topsoil')
+
+#Select site-level parameters and input data from AfSIS data
+forcing_data_Millennial <- forcing_data %>% dplyr::select(Set, param_pH = pH, 
+                                   param_bulkd = bd_extracted, 
+                                   param_claysilt = Clay_63um, 
+                                   forc_st = SoilTMP_C, 
+                                   forc_sw = SoilMoi_m3m3, 
+                                   forc_npp = NPP.gC.m2.d,
+                                   Latitude = Latitude,
+                                   Longitude = Longitude,
+                                   SSN = SSN,
+                                   Depth = Depth) %>% 
+                            mutate(param_bulkd = param_bulkd*1000*0.2, param_pc = 0.86, #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
+                                   site_id = row_number()) %>% 
+                                  filter(Depth == "Topsoil") %>%
+                                  na.omit()
+```
+
+
+#Run MIMICS at AfSIS sites
+```{r}
+#run the model for all sites
+MIMruns <- forcing_data_MIMICS %>% split(1:nrow(forcing_data_MIMICS)) %>% map(~ MIMICS_SS(df=.))
+MIMICS_ss_AllSites <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
+
+MIMICS_ss_AllSites <- MIMICS_ss_AllSites %>% mutate(Soil_Organic_Carbon_kg_m2 = (SOMa + SOMc + SOMp + MICr + MICk), Type = "MIMICS")
+
+hist(MIMICS_ss_AllSites$Soil_Organic_Carbon_kg_m2) #mg C/ cm3 = kg / m3
+
+#Compare pools sizes and variation
+MIM_ss_long <- MIMICS_ss_AllSites %>% select(SET,LITm, LITs, MICr, MICk, SOMa, SOMc, SOMp) %>% pivot_longer(cols = 2:8, names_to = 'Pool', values_to = 'C_content')
+ggplot(MIM_ss_long) + geom_boxplot(aes(x=Pool, y=C_content, fill=Pool, group = Pool)) +ylab("Pool C content 0-30cm (mgC/cm3")+ xlab("Pool") + 
+  scale_fill_manual(values=safe_colorblind_palette, guide="none") + theme_bw(base_size = 14)
+
+#compare inputs and outputs
+ggplot(MIMICS_ss_AllSites) + geom_point(aes(x=CLAY, y=SOMp, colour = LIG_N), size=4) +ylab("SOMp 0-30cm (mgC/cm3)")+ xlab("Clay") +  theme_bw(base_size = 14)
+```
+
+#Run Millennial at AfSIS sites
+```{r}
+# Read in parameters - Described in Table A1 of Abramoff et al. (2021)
+parameters.file <- read.table(here("parameters/soilpara_in_fit.txt"))
+parameters <- as.list(parameters.file$V2)
+names(parameters) <- parameters.file$V1
+
+# Function to run model for one row of site parameters
+run_model_for_site <- function(site_row, base_params) {
+  # Copy full parameter list
+  site_params <- as.list(base_params)
+  
+  # Override default site-specific value with values from AfSIS
+  site_params$param_pH       <- as.numeric(site_row$param_pH)
+  site_params$param_bulkd    <- as.numeric(site_row$param_bulkd)
+  site_params$param_pc       <- as.numeric(site_row$param_pc)
+  site_params$param_claysilt <- as.numeric(site_row$param_claysilt)
+    
+# Format input data
+input_for_site <- data.frame(
+  forc_st  = rep(as.numeric(site_row$forc_st), 365),
+  forc_sw  = rep(as.numeric(site_row$forc_sw), 365),
+  forc_npp = rep(as.numeric(site_row$forc_npp), 365),
+  stringsAsFactors = FALSE
+)
+
+# Run the model with an error-catching wrapper
+  result <- tryCatch({
+    Solve_Model(input_for_site, derivs_V2_MM, site_params)
+  }, error = function(e) {
+    warning(paste("Model failed for site:", site_row$site_id, ":", e$message))
+    return(NULL)
+  })
+
+  if (is.null(result)) return(NULL)
+
+  pool_df <- as.data.frame(t(result$y))
+  pool_df$site_id <- site_row$site_id
+  return(pool_df)
+}
+
+# Apply model across all rows of the site parameter dataframe
+results_list <- apply(forcing_data_Millennial, 1, function(row) {
+  row <- as.list(row)  # Convert row to list for easy referencing
+  run_model_for_site(row, parameters)
+})
+
+# Combine all into one dataframe
+Millennial_ss <- dplyr::bind_rows(results_list)
+Millennial_ss$site_id <- as.integer(Millennial_ss$site_id)
+
+# Merge model outputs with original site parameters if needed
+Millennial_ss_AllSites <- forcing_data_Millennial %>%
+  left_join(Millennial_ss, by = "site_id") %>%
+  mutate(Soil_Organic_Carbon_kg_m2 = (POM + LMWC + AGG + MIC + MAOM) / 1000, Type = "Millennial")
+
+# View final result
+hist(Millennial_ss_AllSites$Soil_Organic_Carbon_kg_m2)
+```
+
+#Combine output
+```{r}
+both_models <- full_join(MIMICS_ss_AllSites %>% select(Set = SET, Soil_Organic_Carbon_kg_m2, Type), Millennial_ss_AllSites %>% select(Set, Soil_Organic_Carbon_kg_m2, Type)) %>% full_join(forcing_data %>% mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100, Type="Observed"))
+
+ggplot(both_models, aes(x=Soil_Organic_Carbon_kg_m2)) + geom_histogram(bins = 30, fill = "steelblue", color = "white") + facet_wrap(~ Type, ncol = 1)
+```
