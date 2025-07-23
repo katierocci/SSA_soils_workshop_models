@@ -38,23 +38,24 @@ source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
 #Load forcing data
 ```{r}
 ##load forcing data
-forcing_data <- read.csv("forcing_data/afsis_ref_updated6.csv", as.is=T) %>% 
+forcing_data <- read.csv("forcing_data/afsis_ref_updated7.csv", as.is=T, row.names = 1) %>% 
   dplyr::select(SSN, Site, Cluster, Plot, Country, Longitude, Latitude,
                 Clay_2um, Clay_8um, Clay_63um, LIG_N, SoilTMP_C, SoilMoi_m3m3,
-                Depth, CORG, pH, bd_extracted, Litterfall.gC.m2.yr, NPP.gC.m2.d) %>% 
+                Depth, CORG, pH, bd_extracted, npp_modis) %>% 
+  #Convert modis NPP from kg to g
+  mutate(npp_modis_gC.m2.yr = npp_modis*1000) %>% 
   filter(Depth == "Topsoil",
          CORG <= 20) %>% 
   drop_na()
-
-# forcing_data <- forcing_data[,-1]
-# colnames(forcing_data)[1] <- "Set"  # Fix for first column name import error
 
 # head(forcing_data)
 
 #match MIMICS names
 forcing_data_MIMICS <- forcing_data %>% 
+  #multiply by 2 to get dry matter
+  mutate(ANPP = npp_modis_gC.m2.yr*2) %>% 
   dplyr::select(SSN, 
-                ANPP = Litterfall.gC.m2.yr, 
+                ANPP,
                 CLAY = Clay_2um,
                 lig_N = LIG_N,
                 TSOI = SoilTMP_C,
@@ -62,13 +63,14 @@ forcing_data_MIMICS <- forcing_data %>%
 
 #Select site-level parameters and input data from AfSIS data
 forcing_data_Millennial <- forcing_data %>% 
+  mutate(forc_npp = npp_modis_gC.m2.yr/365) %>% 
   dplyr::select(SSN, 
                 param_pH = pH, 
                 param_bulkd = bd_extracted, 
                 param_claysilt = Clay_63um, 
                 forc_st = SoilTMP_C, 
                 forc_sw = SoilMoi_m3m3, 
-                forc_npp = NPP.gC.m2.d,
+                forc_npp,
                 Depth = Depth,
                 CORG = CORG) %>% 
   #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
