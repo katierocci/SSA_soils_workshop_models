@@ -27,9 +27,9 @@ model_out <- read.csv("./model_output/both_model_results_default_run.csv", row.n
   #rename SOC column
   dplyr::rename(C_stock_pred_kg_m2 = Soil_Organic_Carbon_kg_m2)
 
-afsis_data <- read.csv("forcing_data/afsis_ref_updated7.csv", as.is=T, , row.names = 1) %>% 
+afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T, , row.names = 1) %>% 
   dplyr::select(SSN, Site, Cluster, Plot, Country, Longitude, Latitude,
-                Clay_2um, Clay_8um, Clay_63um, LIG_N, SoilTMP_C, SoilMoi_m3m3,
+                Clay_2um, Clay_8um, Clay_63um, LIG_N, stemp, sm,
                 Depth, CORG, pH, bd_extracted, npp_modis,
                 Am_Ox_Al, Am_Ox_Fe, Caex, Mgex, Naex, Clay_1_1, Clay_2_1, VegStructure) %>% 
   filter(Depth == "Topsoil",
@@ -154,8 +154,8 @@ ggsave("./model_output/Bias_soil_prop_Millennial.jpeg", width = 12, height = 8)
 p1 <- plot_fun_soil_prop(model = "MIMICS", xvar = npp_modis)
 p2 <- plot_fun_soil_prop(model = "MIMICS", xvar = Clay_2um)
 p3 <- plot_fun_soil_prop(model = "MIMICS", xvar = LIG_N)
-p4 <- plot_fun_soil_prop(model = "MIMICS", xvar = SoilTMP_C)
-p5 <- plot_fun_soil_prop(model = "MIMICS", xvar = SoilMoi_m3m3)
+p4 <- plot_fun_soil_prop(model = "MIMICS", xvar = stemp)
+p5 <- plot_fun_soil_prop(model = "MIMICS", xvar = sm)
 
 
 ggpubr::ggarrange(p1, p2, p3, p4, p5)
@@ -165,8 +165,8 @@ ggsave("./model_output/Bias_forc_para_MIMICS.jpeg", width = 12, height = 8)
 p1 <- plot_fun_soil_prop(model = "Millennial", xvar = pH)
 p2 <- plot_fun_soil_prop(model = "Millennial", xvar = bd_extracted)
 p3 <- plot_fun_soil_prop(model = "Millennial", xvar = Clay_63um)
-p4 <- plot_fun_soil_prop(model = "Millennial", xvar = SoilTMP_C)
-p5 <- plot_fun_soil_prop(model = "Millennial", xvar = SoilMoi_m3m3)
+p4 <- plot_fun_soil_prop(model = "Millennial", xvar = stemp)
+p5 <- plot_fun_soil_prop(model = "Millennial", xvar = sm)
 p6 <- plot_fun_soil_prop(model = "Millennial", xvar = npp_modis)
 
 

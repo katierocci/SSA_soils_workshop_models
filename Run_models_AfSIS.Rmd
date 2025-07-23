@@ -38,9 +38,10 @@ source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
 #Load forcing data
 ```{r}
 ##load forcing data
-forcing_data <- read.csv("forcing_data/afsis_ref_updated7.csv", as.is=T, row.names = 1) %>% 
+forcing_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T, 
+                         row.names = 1) %>% 
   dplyr::select(SSN, Site, Cluster, Plot, Country, Longitude, Latitude,
-                Clay_2um, Clay_8um, Clay_63um, LIG_N, SoilTMP_C, SoilMoi_m3m3,
+                Clay_2um, Clay_8um, Clay_63um, LIG_N, stemp, sm,
                 Depth, CORG, pH, bd_extracted, npp_modis) %>% 
   #Convert modis NPP from kg to g
   mutate(npp_modis_gC.m2.yr = npp_modis*1000) %>% 
@@ -58,8 +59,8 @@ forcing_data_MIMICS <- forcing_data %>%
                 ANPP,
                 CLAY = Clay_2um,
                 lig_N = LIG_N,
-                TSOI = SoilTMP_C,
-                theta_liq = SoilMoi_m3m3) 
+                TSOI = stemp,
+                theta_liq = sm) 
 
 #Select site-level parameters and input data from AfSIS data
 forcing_data_Millennial <- forcing_data %>% 
@@ -68,8 +69,8 @@ forcing_data_Millennial <- forcing_data %>%
                 param_pH = pH, 
                 param_bulkd = bd_extracted, 
                 param_claysilt = Clay_63um, 
-                forc_st = SoilTMP_C, 
-                forc_sw = SoilMoi_m3m3, 
+                forc_st = stemp, 
+                forc_sw = sm, 
                 forc_npp,
                 Depth = Depth,
                 CORG = CORG) %>% 
