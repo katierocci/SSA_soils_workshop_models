@@ -1,0 +1,56 @@
+---
+title: "Fit_Millennial.Rmd"
+output: html_document
+date: "2025-07-23"
+---
+
+#Load libraries, data, model files
+```{r}
+
+```
+
+#Partition training data
+```{r}
+#Partitions data into training and test datasets
+set.seed(1)
+trainIndex <- createDataPartition(Obs.prep$SOM, p = proptrain, list = FALSE, times = 1)
+obsTrain <- Obs.prep[trainIndex,]
+obsTest <- Obs.prep[-trainIndex,]  
+
+inputsTrain <- inputs.prep[trainIndex,]
+inputsTest <- inputs.prep[-trainIndex,]
+
+Obs.pools <- obsTrain
+inputs <- inputsTrain
+```
+
+#Parameters to fit
+```{r}
+
+```
+
+#Set bounds for fitted parameters
+```{r}
+
+```
+
+#Define cost function
+```{r}
+
+```
+
+#Run model fit
+```{r}
+
+```
+
+#Cross-validation on testing set
+```{r}
+
+```
+
+#Model performance indices
+```{r}
+
+```
+
