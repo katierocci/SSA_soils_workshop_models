@@ -38,55 +38,79 @@ source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
 #Load forcing data
 ```{r}
 ##load forcing data
-forcing_data <- read.csv("forcing_data/afsis_ref_updated6.csv", as.is=T)
-forcing_data<- forcing_data[,-1]
-colnames(forcing_data)[1] <- "Set"  # Fix for first column name import error
+forcing_data <- read.csv("forcing_data/afsis_ref_updated6.csv", as.is=T) %>% 
+  dplyr::select(SSN, Site, Cluster, Plot, Country, Longitude, Latitude,
+                Clay_2um, Clay_8um, Clay_63um, LIG_N, SoilTMP_C, SoilMoi_m3m3,
+                Depth, CORG, pH, bd_extracted, Litterfall.gC.m2.yr, NPP.gC.m2.d) %>% 
+  filter(Depth == "Topsoil",
+         CORG <= 20) %>% 
+  drop_na()
+
+# forcing_data <- forcing_data[,-1]
+# colnames(forcing_data)[1] <- "Set"  # Fix for first column name import error
+
+# head(forcing_data)
 
 #match MIMICS names
-forcing_data_MIMICS <- forcing_data %>% select(Set, ANPP = Litterfall.gC.m2.yr, 
-                                               CLAY = Clay_2um,
-                                               lig_N = LIG_N,
-                                               TSOI = SoilTMP_C,
-                                               theta_liq = SoilMoi_m3m3,
-                                               Depth = Depth) %>% 
-  drop_na(ANPP, CLAY, lig_N, TSOI, theta_liq)  %>% 
-  filter(Depth=='Topsoil')
+forcing_data_MIMICS <- forcing_data %>% 
+  dplyr::select(SSN, 
+                ANPP = Litterfall.gC.m2.yr, 
+                CLAY = Clay_2um,
+                lig_N = LIG_N,
+                TSOI = SoilTMP_C,
+                theta_liq = SoilMoi_m3m3) 
 
 #Select site-level parameters and input data from AfSIS data
-forcing_data_Millennial <- forcing_data %>% dplyr::select(Set, param_pH = pH, 
-                                   param_bulkd = bd_extracted, 
-                                   param_claysilt = Clay_63um, 
-                                   forc_st = SoilTMP_C, 
-                                   forc_sw = SoilMoi_m3m3, 
-                                   forc_npp = NPP.gC.m2.d,
-                                   Latitude = Latitude,
-                                   Longitude = Longitude,
-                                   SSN = SSN,
-                                   Depth = Depth) %>% 
-                            mutate(param_bulkd = param_bulkd*1000*0.2, param_pc = 0.86, #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
-                                   site_id = row_number()) %>% 
-                                  filter(Depth == "Topsoil") %>%
-                                  na.omit()
+forcing_data_Millennial <- forcing_data %>% 
+  dplyr::select(SSN, 
+                param_pH = pH, 
+                param_bulkd = bd_extracted, 
+                param_claysilt = Clay_63um, 
+                forc_st = SoilTMP_C, 
+                forc_sw = SoilMoi_m3m3, 
+                forc_npp = NPP.gC.m2.d,
+                Depth = Depth,
+                CORG = CORG) %>% 
+  #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
+  mutate(param_bulkd = param_bulkd*1000*0.2, param_pc = 0.86, 
+         site_id = row_number()) %>% 
+  filter(Depth == "Topsoil") %>%
+  filter(CORG <= 20)
 ```
 
 
 #Run MIMICS at AfSIS sites
 ```{r}
 #run the model for all sites
-MIMruns <- forcing_data_MIMICS %>% split(1:nrow(forcing_data_MIMICS)) %>% map(~ MIMICS_SS(df=.))
-MIMICS_ss_AllSites <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
+MIMruns <- forcing_data_MIMICS %>% 
+  split(1:nrow(forcing_data_MIMICS)) %>%
+  map(~ MIMICS_SS(df=.))
 
-MIMICS_ss_AllSites <- MIMICS_ss_AllSites %>% mutate(Soil_Organic_Carbon_kg_m2 = (SOMa + SOMc + SOMp + MICr + MICk), Type = "MIMICS")
+MIMICS_ss_AllSites <- lapply(MIMruns, MIMICS_SS_format) %>% 
+  bind_rows()
+
+MIMICS_ss_AllSites <- MIMICS_ss_AllSites %>% 
+  mutate(Soil_Organic_Carbon_kg_m2 = (SOMa + SOMc + SOMp + MICr + MICk), Type = "MIMICS")
 
 hist(MIMICS_ss_AllSites$Soil_Organic_Carbon_kg_m2) #mg C/ cm3 = kg / m3
 
 #Compare pools sizes and variation
-MIM_ss_long <- MIMICS_ss_AllSites %>% select(SET,LITm, LITs, MICr, MICk, SOMa, SOMc, SOMp) %>% pivot_longer(cols = 2:8, names_to = 'Pool', values_to = 'C_content')
-ggplot(MIM_ss_long) + geom_boxplot(aes(x=Pool, y=C_content, fill=Pool, group = Pool)) +ylab("Pool C content 0-30cm (mgC/cm3")+ xlab("Pool") + 
-  scale_fill_manual(values=safe_colorblind_palette, guide="none") + theme_bw(base_size = 14)
+MIM_ss_long <- MIMICS_ss_AllSites %>% 
+  select(SSN,LITm, LITs, MICr, MICk, SOMa, SOMc, SOMp) %>% 
+  pivot_longer(cols = 2:8, names_to = 'Pool', values_to = 'C_content')
+
+ggplot(MIM_ss_long) + 
+  geom_boxplot(aes(x=Pool, y=C_content, fill=Pool, group = Pool)) +
+  ylab("Pool C content 0-20cm (mgC/cm3")+ 
+  xlab("Pool") + 
+  scale_fill_manual(values=safe_colorblind_palette, guide="none") + 
+  theme_bw(base_size = 14)
 
 #compare inputs and outputs
-ggplot(MIMICS_ss_AllSites) + geom_point(aes(x=CLAY, y=SOMp, colour = LIG_N), size=4) +ylab("SOMp 0-30cm (mgC/cm3)")+ xlab("Clay") +  theme_bw(base_size = 14)
+ggplot(MIMICS_ss_AllSites) + 
+  geom_point(aes(x=CLAY, y=SOMp, colour = LIG_N), size=4) +
+  ylab("SOMp 0-20cm (mgC/cm3)")+ xlab("Clay") +  
+  theme_bw(base_size = 14)
 ```
 
 #Run Millennial at AfSIS sites
@@ -151,7 +175,14 @@ hist(Millennial_ss_AllSites$Soil_Organic_Carbon_kg_m2)
 
 #Combine output
 ```{r}
-both_models <- full_join(MIMICS_ss_AllSites %>% select(Set = SET, Soil_Organic_Carbon_kg_m2, Type), Millennial_ss_AllSites %>% select(Set, Soil_Organic_Carbon_kg_m2, Type)) %>% full_join(forcing_data %>% mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100, Type="Observed"))
+both_models <- full_join(MIMICS_ss_AllSites %>% 
+                           select(SSN, Soil_Organic_Carbon_kg_m2, Type), 
+                         Millennial_ss_AllSites %>% 
+                           select(SSN, Soil_Organic_Carbon_kg_m2, Type)) 
 
-ggplot(both_models, aes(x=Soil_Organic_Carbon_kg_m2)) + geom_histogram(bins = 30, fill = "steelblue", color = "white") + facet_wrap(~ Type, ncol = 1)
+write.csv(both_models, "./model_output/both_model_results_default_run.csv")
+
+ggplot(both_models, aes(x=Soil_Organic_Carbon_kg_m2)) + 
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") + 
+  facet_wrap(~ Type, ncol = 1)
 ```
