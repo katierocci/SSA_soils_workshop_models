@@ -1,3 +1,4 @@
+
 ---
 title: "Fit_Millennial.Rmd"
 output: html_document
@@ -6,19 +7,51 @@ date: "2025-07-23"
 
 #Load libraries, data, model files
 ```{r}
+#load libraries
+library(FME)
+library(here)
+library(caret)
 
+##load forcing data
+forcing_data <- read.csv("forcing_data/afsis_ref_updated6.csv", as.is=T)
+forcing_data <- forcing_data[,-c(1:3)] # Fix for first column name import error
+
+forcing_data_Millennial <- forcing_data %>% 
+                                   drop_na(Litterfall.gC.m2.yr, NPP.gC.m2.d, Clay_2um, Clay_63um, SoilTMP_C, SoilMoi_m3m3, pH, bd_extracted, LIG_N) %>%
+                                   dplyr::select(param_pH = pH,
+                                   param_bulkd = bd_extracted, 
+                                   param_claysilt = Clay_63um, 
+                                   forc_st = SoilTMP_C, 
+                                   forc_sw = SoilMoi_m3m3, 
+                                   forc_npp = NPP.gC.m2.d,
+                                   Latitude,
+                                   Longitude,
+                                   SSN,
+                                   Depth,
+                                   CORG) %>% 
+                            mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*param_bulkd*20/100) %>%
+                            mutate(param_bulkd = param_bulkd*1000*0.2, param_pc = 0.86)  %>% #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
+                                  filter(Depth == "Topsoil", CORG <= 20)
+
+SOC_obs <- forcing_data_Millennial %>% select(Soil_Organic_Carbon_kg_m2, SSN)
+
+#load millennial model components
+source(here("functions/run_functions.R")) #R script that contains calls to run model
+source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
 ```
 
 #Partition training data
 ```{r}
+proptrain = 0.8
+
 #Partitions data into training and test datasets
 set.seed(1)
-trainIndex <- createDataPartition(Obs.prep$SOM, p = proptrain, list = FALSE, times = 1)
-obsTrain <- Obs.prep[trainIndex,]
-obsTest <- Obs.prep[-trainIndex,]  
+trainIndex <- createDataPartition(SOC_obs$Soil_Organic_Carbon_kg_m2, p = proptrain, list = FALSE, times = 1)
+obsTrain <- SOC_obs[trainIndex,]
+obsTest <- SOC_obs[-trainIndex,]  
 
-inputsTrain <- inputs.prep[trainIndex,]
-inputsTest <- inputs.prep[-trainIndex,]
+inputsTrain <- forcing_data_Millennial[trainIndex,]
+inputsTest <- forcing_data_Millennial[-trainIndex,]
 
 Obs.pools <- obsTrain
 inputs <- inputsTrain
