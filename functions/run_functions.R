@@ -54,3 +54,67 @@ Solve_Model  <- function(inputdata,derivs,parameters,calc_eigens=0,state=c(POM =
     SS_output <- stode(y = state, time = SStime, func = derivs_SS_wrapper, parms = parameters, forc_st=forc_st, forc_sw=forc_sw, forc_npp=forc_npp, positive = TRUE)
     return(SS_output)
 }
+
+Solve_Model_for_Row <- function(row, parameters, state = c(POM = 1, LMWC = 1, AGG = 1, MIC = 1, MAOM = 1)) {
+  SStime <- 1000 * 365
+  
+  forc_st <- approxfun(1:SStime, rep(row$forc_st, SStime))
+  forc_sw <- approxfun(1:SStime, rep(row$forc_sw, SStime))
+  forc_npp <- approxfun(1:SStime, rep(row$forc_npp, SStime))
+  
+  # Override default site-specific value with values from AfSIS
+  parameters$param_pH       <- as.numeric(row$param_pH)
+  parameters$param_bulkd    <- as.numeric(row$param_bulkd)
+  parameters$param_claysilt <- as.numeric(row$param_claysilt)
+  
+  derivs_SS_wrapper <- function(step.num, state, parameters, forc_st, forc_sw, forc_npp) {
+    
+    output <- derivs_V2_MM(step.num, state, parameters, forc_st, forc_sw, forc_npp)
+    
+    return(list(output[[1]][1:5]))
+  }
+  
+  state.SS <- stode(
+    y = state,
+    time = SStime,
+    func = derivs_SS_wrapper,
+    parms = parameters,
+    forc_st = forc_st,
+    forc_sw = forc_sw,
+    forc_npp = forc_npp,
+    positive = TRUE
+  )
+  
+  modeled <- as.data.frame(cbind(row$SSN_row_ID, 
+                                 state.SS$y[1], 
+                                 state.SS$y[2], 
+                                 state.SS$y[3], 
+                                 state.SS$y[4], 
+                                 state.SS$y[5], 
+                                 sum(state.SS$y[1:5])))
+  names(modeled) <- c("SSN_row_ID", "POM", "LMWC", "AGG", "MIC", "MAOM", "Soil_Organic_Carbon_kg_m2")
+  
+  #re-define type as numeric and convert from g/m2 to kg/m2
+  modeled$POM <- as.numeric(modeled$POM)/1000
+  modeled$LMWC <- as.numeric(modeled$LMWC)/1000
+  modeled$AGG <- as.numeric(modeled$AGG)/1000
+  modeled$MIC <- as.numeric(modeled$MIC)/1000
+  modeled$MAOM <- as.numeric(modeled$MAOM)/1000
+  modeled$Soil_Organic_Carbon_kg_m2 <- as.numeric(modeled$Soil_Organic_Carbon_kg_m2)/1000
+  
+  return(modeled)
+}
+
+Solve_Model_for_Fit <- function(inputdata, parameters) {
+  row_list <- split(inputdata, seq_len(nrow(inputdata)))
+  
+  modeled_pools_list <- lapply(row_list, function(row) {
+    model_out <- Solve_Model_for_Row(row, parameters)
+  })
+  
+  modeled.pools <- do.call(rbind, modeled_pools_list)
+  
+  rownames(modeled.pools) <- NULL
+  return(modeled.pools)
+  
+}

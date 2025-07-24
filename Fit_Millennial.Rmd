@@ -1,8 +1,8 @@
-
 ---
 title: "Fit_Millennial.Rmd"
 output: html_document
-date: "2025-07-23"
+date: "2025-07-22"
+authors: "R Abramoff and Katie Rocci"
 ---
 
 #Load libraries, data, model files
@@ -11,10 +11,12 @@ date: "2025-07-23"
 library(FME)
 library(here)
 library(caret)
+library(dplyr)
+library(tidyr)
 
 ##load forcing data
 forcing_data <- read.csv("forcing_data/afsis_ref_updated6.csv", as.is=T)
-forcing_data <- forcing_data[,-c(1:3)] # Fix for first column name import error
+forcing_data <- forcing_data[,-c(1,3)] # Fix for first column name import error
 
 forcing_data_Millennial <- forcing_data %>% 
                                    drop_na(Litterfall.gC.m2.yr, NPP.gC.m2.d, Clay_2um, Clay_63um, SoilTMP_C, SoilMoi_m3m3, pH, bd_extracted, LIG_N) %>%
@@ -26,18 +28,24 @@ forcing_data_Millennial <- forcing_data %>%
                                    forc_npp = NPP.gC.m2.d,
                                    Latitude,
                                    Longitude,
-                                   SSN,
                                    Depth,
+                                   SSN_row_ID = X,
                                    CORG) %>% 
                             mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*param_bulkd*20/100) %>%
-                            mutate(param_bulkd = param_bulkd*1000*0.2, param_pc = 0.86)  %>% #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
+                            mutate(param_bulkd = param_bulkd*1000*0.2)  %>% #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
                                   filter(Depth == "Topsoil", CORG <= 20)
 
-SOC_obs <- forcing_data_Millennial %>% select(Soil_Organic_Carbon_kg_m2, SSN)
+#define observed SOC as a dataframe
+SOC_obs <- forcing_data_Millennial %>% select(Soil_Organic_Carbon_kg_m2, SSN_row_ID)
 
 #load millennial model components
 source(here("functions/run_functions.R")) #R script that contains calls to run model
 source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
+
+#load default parameters - Described in Table A1 of Abramoff et al. (2021)
+parameters.file <- read.table(here("parameters/soilpara_in_fit_with_qmax.txt"))
+parameters <- as.list(parameters.file$V2)
+names(parameters) <- parameters.file$V1
 ```
 
 #Partition training data
@@ -57,24 +65,119 @@ Obs.pools <- obsTrain
 inputs <- inputsTrain
 ```
 
-#Parameters to fit
+#Scaling function
 ```{r}
-
+rescale_multiply_restore <- function(x, factor = 1.5) {
+  # Step 1: Save original min and max
+  x_min <- min(x, na.rm = TRUE)
+  x_max <- max(x, na.rm = TRUE)
+  
+  # Avoid divide-by-zero error
+  if (x_max == x_min) {
+    warning("All values are equal. Returning original vector.")
+    return(x)
+  }
+  
+  # Step 2: Normalize to [0, 1]
+  x_scaled <- (x - x_min) / (x_max - x_min)
+  
+  # Step 3: Multiply by fixed factor
+  x_scaled_mod <- x_scaled * factor
+  
+  # Optional: clamp values to [0, 1] if factor pushes them out of bounds
+  x_scaled_mod <- pmax(pmin(x_scaled_mod, 1), 0)
+  
+  # Step 4: Rescale back to original range
+  x_rescaled <- x_scaled_mod * (x_max - x_min) + x_min
+  
+  return(x_rescaled)
+}
 ```
 
-#Set bounds for fitted parameters
+#Parameters to fit
 ```{r}
+parToFit.pools <- c(param_pc = parameters$param_pc, #sorption
+                    alpha_pl = parameters$alpha_pl, #Vmax
+                    eact_pl = parameters$eact_pl, #Vmax
+                    ##alpha_lb = parameters$alpha_lb, #Vmax
+                    ##eact_lb = parameters$eact_lb, #Vmax
+                    kaff_pl = parameters$kaff_pl, #Km
+                    cue_ref = parameters$cue_ref, #CUE
+                    param_p1 = parameters$param_p1, #sorption
+                    ##kaff_lb = parameters$kaff_lb, #Km
+                    rate_bd = parameters$rate_bd, #microbial turnover
+                    param_pb = parameters$param_pb #fraction turnover partition to MAOM
+) 
 
+parToFit.pools <- c(eact_pl = parameters$eact_pl, alpha_pl = parameters$alpha_pl)
+
+parToFit.lower <- parToFit.pools*0.5
+#parToFit.lower <- rescale_multiply_restore(parToFit.pools, factor=0.5)
+# parToFit.lower <- c(param_pc = 0, #sorption
+#                     alpha_pl = 0, #Vmax
+#                     eact_pl = 0, #Vmax
+#                     #alpha_lb = 0, #Vmax
+#                     #eact_lb = 0, #Vmax
+#                     kaff_pl = 0, #Km
+#                     cue_ref = 0, #CUE
+#                     param_p1 = 0, #sorption
+#                     #kaff_lb = 0, #Km
+#                     rate_bd = 0, #microbial turnover
+#                     param_pb = 0 #fraction turnover partition to MAOM
+# ) 
+# 
+parToFit.upper <- parToFit.pools*1.5
+#parToFit.upper <- rescale_multiply_restore(parToFit.pools, factor=1.5)
+# parToFit.upper <- c(param_pc = Inf, #sorption
+#                     alpha_pl = Inf, #Vmax
+#                     eact_pl = Inf, #Vmax
+#                     #alpha_lb = Inf, #Vmax
+#                     #eact_lb = Inf, #Vmax
+#                     kaff_pl = Inf, #Km
+#                     cue_ref = 1, #CUE
+#                     param_p1 = Inf, #sorption
+#                     #kaff_lb = Inf, #Km
+#                     rate_bd = Inf, #microbial turnover
+#                     param_pb = 1 #fraction turnover partition to MAOM
+#) 
 ```
 
 #Define cost function
 ```{r}
-
+# Definition of the cost function
+Objective.pools <- function(x, parset = names(x)) {
+  parameters[parset] <- x
+  out <- Solve_Model_for_Fit(inputsTrain, parameters)
+  modCost(out, Obs.pools, x="SSN_row_ID", weight = "none")
+}
 ```
 
 #Run model fit
 ```{r}
+start_time = Sys.time()
+# Fit the model
+Fit.pools <- modFit(
+  f = Objective.pools,
+  p = parToFit.pools,
+  lower = parToFit.lower,
+  upper = parToFit.upper,
+  method = "BFGS", #BFGS #Marq
+  jac = NULL,
+  control = list(
+    ftol = 1e-06,
+    ptol = 1e-06,
+    gtol = 1e-06,
+    nprint = 1
+  ),
+  hessian = TRUE
+)
+end_time = Sys.time()
+fit.time <- end_time - start_time
 
+# Save the best parameters as a table
+outtab <- cbind(Fit.pools$par, parToFit.lower, parToFit.pools, parToFit.upper)
+colnames(outtab) <- c("FitPars","Lower","Default","Upper")
+write.csv(outtab, file= here("parameter_fit_SSA.csv"))
 ```
 
 #Cross-validation on testing set
