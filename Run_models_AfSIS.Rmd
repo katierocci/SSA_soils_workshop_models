@@ -73,6 +73,8 @@ forcing_data_Millennial <- forcing_data %>% dplyr::select(Set, param_pH = pH,
 #Run MIMICS at AfSIS sites
 ```{r}
 #run the model for all sites
+Vslope_MULT <- fitted_params$Vslope
+
 MIMruns <- forcing_data_MIMICS %>% split(1:nrow(forcing_data_MIMICS)) %>% map(~ MIMICS_SS(df=.))
 MIMICS_ss_AllSites <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
 

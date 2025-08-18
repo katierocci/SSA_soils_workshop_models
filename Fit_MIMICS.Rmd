@@ -1,0 +1,236 @@
+---
+title: "Fit_MIMICS"
+author: "Katherine Rocci"
+date: "2025-07-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Load libraries, data, model files
+```{r}
+#load libraries
+library(FME)
+library(purrr)
+library(rootSolve)
+library(dplyr) 
+library(tidyr)
+library(ggplot2)
+library(here)
+library(caret)
+library(tibble)
+
+#load forcing data
+forcing_data <- read.csv("forcing_data/afsis_ref_updated6.csv", as.is=T)
+
+#match MIMICS names
+forcing_data_MIMICS <- forcing_data %>% 
+  drop_na(Litterfall.gC.m2.yr, pH, Clay_2um, LIG_N, SoilTMP_C, SoilMoi_m3m3, NPP.gC.m2.d, Clay_63um, bd_extracted)  %>% 
+  filter(CORG <=20) %>%
+  mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100) %>%
+  select(X, ANPP = Litterfall.gC.m2.yr, 
+         CLAY = Clay_2um,
+         lig_N = LIG_N,
+         TSOI = SoilTMP_C,
+         theta_liq = SoilMoi_m3m3,
+         Depth = Depth, Soil_Organic_Carbon_kg_m2) %>%
+  filter(Depth=='Topsoil')
+
+#load mimics model components
+source(here("ODEs/RXEQ.R"))
+source(here("parameters/MIMICS_parameters_sandbox_20231129.R"))
+source(here("functions/calc_Tpars.R"))
+source(here("functions/MIMICS_calc_steady_state_pools.R"))
+
+```
+
+#Partition training data
+```{r}
+proptrain = 0.8
+
+#Partitions data into training and test datasets
+set.seed(1)
+trainIndex <- createDataPartition(forcing_data_MIMICS$Soil_Organic_Carbon_kg_m2, p = proptrain, list = FALSE, times = 1)
+obsTrain <- forcing_data_MIMICS[trainIndex,] %>% select(X,Soil_Organic_Carbon_kg_m2)
+obsTest <- forcing_data_MIMICS[-trainIndex,] %>% select(X,Soil_Organic_Carbon_kg_m2)
+
+inputsTrain <- forcing_data_MIMICS[trainIndex,] %>% select(-Soil_Organic_Carbon_kg_m2)
+inputsTest <- forcing_data_MIMICS[-trainIndex,] %>% select(-Soil_Organic_Carbon_kg_m2)
+
+Obs.pools <- obsTrain
+inputs <- inputsTrain
+```
+
+#Parameters to fit
+*Note: must use multipliers for MIMICS because parameters are not singular values
+```{r}
+parToFit.pools <- c(Vslope_MULT = Vslope_MULT,
+                    Vint_MULT = Vint_MULT,
+                    Kslope_MULT = Kslope_MULT,
+                    Kint_MULT = Kint_MULT,
+                    #kMOD_MULT = kMOD_MULT,
+                    #vMOD_MULT = vMOD_MULT,
+                    Tau_MULT = Tau_MULT,
+                    CUE_MULT = CUE_MULT,
+                    desorb_MULT = desorb_MULT,
+                    fPHYS_MULT = fPHYS_MULT
+                    ) 
+```
+
+#Set bounds for fitted parameters
+```{r}
+parToFit.lower <- c(Vslope_MULT = 0.4,
+                    Vint_MULT = 0.3,
+                    Kslope_MULT = 0.4,
+                    Kint_MULT = 0.3,
+                    #kMOD_MULT = 0.5,
+                    #vMOD_MULT = 0.5,
+                    Tau_MULT = 0.3,
+                    CUE_MULT = 0.2,
+                    desorb_MULT = 0.001,
+                    fPHYS_MULT = 0.01
+                    )
+
+parToFit.upper <- c(Vslope_MULT = 4,
+                    Vint_MULT = 3,
+                    Kslope_MULT = 4,
+                    Kint_MULT = 3,
+                    #kMOD_MULT = 2,
+                    #vMOD_MULT = 2,
+                    Tau_MULT = 3,
+                    CUE_MULT = 1.33, #decreased from 2 to 1.33 from Derek's code
+                    desorb_MULT = 1, #increased from 0.3 to 1 from Derek's code
+                    fPHYS_MULT = 4
+                    )
+```
+
+#Define cost function
+```{r}
+# Definition of the cost function
+Objective.pools <- function(x, parset = names(x)) { #x = full list of parameters and parset is subset that will be changed
+  pars[parset] <- x
+  list2env(pars, envir = .GlobalEnv)
+  MIMruns <- inputsTrain %>% split(1:nrow(inputsTrain)) %>% map(~ MIMICS_SS(df=.))
+  out <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
+  out2 <- out %>% select(X, Soil_Organic_Carbon_kg_m2)
+  modCost(out2, Obs.pools, x="X", weight = "none") 
+  #check<- #y = "modSOC_kg_m2", obs = "Soil_Organic_Carbon_kg_m2",
+  #print(check)
+}
+```
+
+#Run model fit
+```{r}
+#create list of pars
+pars = list(Vslope=rep(0.063, 6), Vint=rep(5.47, 6), aV=rep(0.000008, 6), Kslope=rep(c(0.025, 0.035, 0.025),2),
+            Kint=rep(3.19, 6), aK=rep(10, 6), vMOD=c(10, 2, 10, 3, 3, 2), kMOD=c(8, 2, 4, 2, 4, 6), KO=c(6, 6),
+            CUE=c(0.55, 0.25, 0.75, 0.35), tau_r=c(0.00052, 0.3), tau_K=c(0.00024, 0.1), Tau_MOD=c(100, 0.8, 1.2, 2),
+            beta=as.numeric(c(1.5, 1.5)), fPHYS_r=c(0.3, 1.3), fPHYS_K=c(0.2, 0.8), fCHEM_r=c(0.1, -3, 1), 
+            fCHEM_K=c(0.3, -3, 1), fSOM_p=c(1.5e-5, -1.5), PHYS_scalar=c(2, -2, NA, NA, NA, NA), FI=c(0.05, 0.05),
+            fmet_p=c(1, 0.85, 0.013), Tau_MULT=1, desorb_MULT=1, fPHYS_MULT=1, Vslope_MULT = 1, Vint_MULT = 1,
+            Kslope_MULT = 1, Kint_MULT = 1, vMOD_MULT = 1, kMOD_MULT = 1, CUE_MULT = 1)
+
+# Fit the model
+Fit.pools <- modFit(
+  f = Objective.pools,
+  p = parToFit.pools,
+  lower = parToFit.lower,
+  upper = parToFit.upper,
+  method = "Marq",
+  jac = NULL,
+  control = list(
+    ftol = 1e-06,
+    ptol = 1e-06,
+    gtol = 1e-06,
+    nprint = 1
+  ),
+  hessian = TRUE
+)
+
+fitted_params <- as.data.frame(Fit.pools$par[1:8])
+RMSE <- sqrt(Fit.pools$ssr/Fit.pools$df.residual) #5.23
+
+```
+
+#Cross-validation on testing set
+```{r}
+#apply multipliers
+Vslope_MULT <<- fitted_params["Vslope_MULT",]
+Vint_MULT <<- fitted_params["Vint_MULT",]
+Kslope_MULT <<- fitted_params["Kslope_MULT",]
+Kint_MULT <<- fitted_params["Kint_MULT",]
+Tau_MULT <<- fitted_params["Tau_MULT",]
+CUE_MULT <<- fitted_params["CUE_MULT",]
+desorb_MULT <<- fitted_params["desorb_MULT",]
+fPHYS_MULT <<- fitted_params["fPHYS_MULT",]
+
+#run with test data
+MIMruns.test <- inputsTest %>% split(1:nrow(inputsTest)) %>% map(~ MIMICS_SS(df=.))
+out.test <- lapply(MIMruns.test, MIMICS_SS_format) %>% bind_rows()
+out.test2 <- out.test %>% select(X, Soil_Organic_Carbon_kg_m2)
+Test.mod <- modCost(out.test2, obsTest, x="X", weight = "none") 
+ModObs <- as.data.frame(Test.mod$residuals)
+ggplot(ModObs) + geom_point(aes(x=obs, y=mod)) + geom_abline(slope=1, intercept=0) 
+statmod <- lm(mod~obs, data=ModObs)
+summary(statmod)$r.squared #0.13
+```
+
+#Model performance indices
+```{r}
+
+```
+
+
+#debugging
+
+```{r}
+pars = list(Vslope=rep(0.063, 6), Vint=rep(5.47, 6), aV=rep(0.000008, 6), Kslope=rep(c(0.025, 0.035, 0.025),2),
+            Kint=rep(3.19, 6), aK=rep(10, 6), vMOD=c(10, 2, 10, 3, 3, 2), kMOD=c(8, 2, 4, 2, 4, 6), KO=c(6, 6),
+            CUE=c(0.55, 0.25, 0.75, 0.35), tau_r=c(0.00052, 0.3), tau_K=c(0.00024, 0.1), Tau_MOD=c(100, 0.8, 1.2, 2),
+            beta=as.numeric(c(1.5, 1.5)), fPHYS_r=c(0.3, 1.3), fPHYS_K=c(0.2, 0.8), fCHEM_r=c(0.1, -3, 1), 
+            fCHEM_K=c(0.3, -3, 1), fSOM_p=c(1.5e-5, -1.5), PHYS_scalar=c(2, -2, NA, NA, NA, NA), FI=c(0.05, 0.05),
+            fmet_p=c(1, 0.85, 0.013), Tau_MULT=1, desorb_MULT=1, fPHYS_MULT=1, Vslope_MULT = 1, Vint_MULT = 1,
+            Kslope_MULT = 1, Kint_MULT = 1, CUE_MULT = 1)
+par2<-pars
+
+x=parToFit.pools
+x2=parToFit.pools*2
+
+parset = names(x)
+
+pars[parset] <- x
+
+par2[parset] <-x2
+
+list2env(par2, envir = .GlobalEnv)
+
+```
+
+
+```{r}
+MIMruns <- inputsTrain %>% split(1:nrow(inputsTrain)) %>% map(~ MIMICS_SS(df=.))
+out <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
+out2 <- out %>% select(SSN, Soil_Organic_Carbon_kg_m2)
+#out2$X <- 1:length(out2$Soil_Organic_Carbon_kg_m2)
+#Obs.pools$X <- 1:length(out2$Soil_Organic_Carbon_kg_m2)
+out2 <- out2 %>% mutate(X=1:length(Soil_Organic_Carbon_kg_m2)) %>% select(-SSN)
+Obs.pools <- Obs.pools %>% mutate(X=1:length(Soil_Organic_Carbon_kg_m2)) %>% select(-SSN)
+#out2.check = out2[1:3,]
+#obs.check = Obs.pools[1:3,]
+
+modCost(model=out2, obs=Obs.pools, x="X", weight = "none")
+```
+
+
+```{r}
+#fake model and obs data
+SSN.test = c(1,2,3,4)
+test = c(4,7,2,8)
+mod.data.test = data.frame(SSN.test,test)
+test = c(5,3,8,6)
+obs.data.test = data.frame(SSN.test,test)
+modCost(model=mod.data.test, obs=obs.data.test, x="SSN.test", weight = "none")
+```
+

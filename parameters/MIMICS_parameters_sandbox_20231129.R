@@ -44,5 +44,11 @@ psMethod='clay' #'clay' and 'metal' accepted - not extensively tested!
 Tau_MULT = 1
 desorb_MULT = 1
 fPHYS_MULT = 1
-
+Vslope_MULT = 1
+Vint_MULT = 1
+Kslope_MULT = 1
+Kint_MULT = 1
+vMOD_MULT = 1
+kMOD_MULT = 1
+CUE_MULT = 1
 

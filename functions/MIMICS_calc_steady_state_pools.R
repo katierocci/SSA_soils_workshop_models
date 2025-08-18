@@ -3,7 +3,7 @@ library(rootSolve)
 
 ###############################################
 # MIMICS single point function
-#> Input dataframe ("df") must contain columns: SITE, ANPP, fCLAY, TSOI, LIG_N or LIG + CN // Optional: MAT, GWC, W_SCALAR
+#> Input dataframe ("df") must contain columns: SITE, ANPP (should be NPP?), fCLAY, TSOI, LIG_N or LIG + CN // Optional: MAT, GWC, W_SCALAR
 #>> With output required for running forward
 ###############################################
 MIMICS_SS <- function(df){
@@ -134,6 +134,8 @@ MIMICS_SS_format <- function(MIMICS_SS_output) {
   MIMout_C_pools$MIMLIT <- MIMout_C_pools$LITm + MIMout_C_pools$LITs
   MIMout_C_pools$MIMMIC <- MIMout_C_pools$MICr + MIMout_C_pools$MICk
   MIMout_C_pools$MIC_ratio <- MIMout_C_pools$MICr/MIMout_C_pools$MICk
+  MIMout_C_pools$modSOC_kg_m2 <- rowSums(MIMout_C_pools[,3:7]) #added for fitting; doesn't include litter in SOC
+  MIMout_C_pools$Soil_Organic_Carbon_kg_m2 <- rowSums(MIMout_C_pools[,3:7]) 
 
   MIMout_CO2_pools <- as.data.frame(t(as.data.frame(MIMICS_SS_output[[4]])))
   colnames(MIMout_CO2_pools) <- c("CO2r", "CO2k")
@@ -142,7 +144,7 @@ MIMICS_SS_format <- function(MIMICS_SS_output) {
   MIMout_C_pools$SOMp_Turnover_yrs <- MIMout_C_pools$SOMp/SOMp_desorb_yr
 
   MIMout_single_tbl <- cbind(as.data.frame(MIMICS_SS_output[[3]]), MIMout_C_pools %>%
-                               select(MIMSOC, MIMLIT, MIMMIC, MIC_ratio, LITm, LITs, MICr,
+                               select(MIMSOC, MIMLIT, MIMMIC, MIC_ratio, Soil_Organic_Carbon_kg_m2, LITm, LITs, MICr,
                                       MICk, SOMa, SOMc, SOMp, SOMp_Turnover_yrs),
                              MIMout_CO2_pools)
   return(MIMout_single_tbl)
