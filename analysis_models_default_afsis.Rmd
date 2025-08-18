@@ -32,6 +32,7 @@ afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T, , row.nam
                 Clay_2um, Clay_8um, Clay_63um, LIG_N, stemp, sm,
                 Depth, CORG, pH, bd_extracted, npp_modis,
                 Am_Ox_Al, Am_Ox_Fe, Caex, Mgex, Naex, Clay_1_1, Clay_2_1, VegStructure) %>% 
+  unite("Country_Site", Country, Site, remove = FALSE) %>% 
   filter(Depth == "Topsoil",
          CORG <= 20) %>% 
   drop_na() %>% 
@@ -47,9 +48,10 @@ data_merged <- model_out %>%
 
 #Plot predicted vs observed for both models
 ```{r}
-data_merged %>%
+
+pred_obs <- data_merged %>%
   ggplot(aes(x = C_stock_pred_kg_m2, y = C_stock_obs_kg_m2)) +
-  geom_point(aes(color = Site)) +
+  geom_point(aes(color = Country_Site)) +
   scale_x_continuous("Predicted SOC (kg/m2)", expand = c(0,0)) +
   scale_y_continuous("Observed SOC (kg/m2)", expand = c(0,0)) +
   geom_abline(slope = 1) +
@@ -57,7 +59,12 @@ data_merged %>%
   theme_bw(base_size = 16) +
   theme(legend.position = "none") +
   facet_wrap(~Type, scales = "free_x")
-ggsave("./model_output/Pred_Obs_BothModels.jpeg", width = 12, height = 6)
+pred_obs
+ggsave(paste0("./model_output/Pred_Obs_BothModels_",
+              Sys.Date(), ".jpeg"), width = 12, height = 6)
+
+# Interactive plot
+# plotly::ggplotly(pred_obs)
 
 lm_mimics <- lm(C_stock_obs_kg_m2 ~ C_stock_pred_kg_m2, 
                 data = data_merged %>% filter(Type == "MIMICS"))
@@ -78,7 +85,7 @@ plot_fun_soil_prop <- function(xvar, model){
   data_merged %>% 
     filter(Type == {{model}}) %>% 
     ggplot(aes(y = C_bias_kg_m2, x = {{xvar}})) +
-    geom_point(aes(color = Site)) +
+    geom_point(aes(color = Country_Site)) +
     scale_y_continuous("Pred - Obs SOC stocks ") +
     geom_smooth(method = "lm") +
     theme_bw(base_size = 14) +
@@ -86,92 +93,103 @@ plot_fun_soil_prop <- function(xvar, model){
 }
 
 #MIMICS
-p1 <- plot_fun_soil_prop(model = "MIMICS", xvar = Am_Ox_Al) +
+mim1 <- plot_fun_soil_prop(model = "MIMICS", xvar = Am_Ox_Al) +
   scale_x_continuous("Oxalate Al (mg/kg)")
 
-p2 <- plot_fun_soil_prop(model = "MIMICS", xvar = Am_Ox_Fe) +
+mim2 <- plot_fun_soil_prop(model = "MIMICS", xvar = Am_Ox_Fe) +
   scale_x_continuous("Oxalate Fe (mg/kg)")
 
-p3 <- plot_fun_soil_prop(model = "MIMICS", xvar = Caex) +
+mim3 <- plot_fun_soil_prop(model = "MIMICS", xvar = Caex) +
   scale_x_continuous("exchangeable Ca (cmol/kg soil)")
 
-p4 <- plot_fun_soil_prop(model = "MIMICS", xvar = Mgex) +
+mim4 <- plot_fun_soil_prop(model = "MIMICS", xvar = Mgex) +
   scale_x_continuous("exchangeable Mg (cmol/kg soil)")
 
-p5 <- plot_fun_soil_prop(model = "MIMICS", xvar = Naex) +
+mim5 <- plot_fun_soil_prop(model = "MIMICS", xvar = Naex) +
   scale_x_continuous("exchangeable Na (cmol/kg soil)")
 
-p6 <- plot_fun_soil_prop(model = "MIMICS", xvar = pH) +
+mim6 <- plot_fun_soil_prop(model = "MIMICS", xvar = pH) +
   scale_x_continuous("pH")
 
-p7 <- plot_fun_soil_prop(model = "MIMICS", xvar = Clay_63um) +
+mim7 <- plot_fun_soil_prop(model = "MIMICS", xvar = Clay_63um) +
   scale_x_continuous("Clay < 63 um")
 
-p8 <- plot_fun_soil_prop(model = "MIMICS", xvar = Clay_1_1) +
+mim8 <- plot_fun_soil_prop(model = "MIMICS", xvar = Clay_1_1) +
   scale_x_continuous("1:1 clays (%)")
 
-p9 <- plot_fun_soil_prop(model = "MIMICS",xvar = Clay_2_1) +
+mim9 <- plot_fun_soil_prop(model = "MIMICS",xvar = Clay_2_1) +
   scale_x_continuous("2:1 clays (%)")
 
-ggpubr::ggarrange(p1, p2, p3, p4, p5, p6, p7, p8, p9)
-ggsave("./model_output/Bias_soil_prop_MIMICS.jpeg", width = 12, height = 8)
+ggpubr::ggarrange(mim1, mim2, mim3, mim4, mim5, mim6, mim7, mim8, mim9)
+ggsave(paste0("./model_output/Bias_soil_prop_MIMICS_",
+              Sys.Date(), ".jpeg"), width = 12, height = 8)
 
 #Millennial
-p1 <- plot_fun_soil_prop(model = "Millennial", xvar = Am_Ox_Al) +
+mil1 <- plot_fun_soil_prop(model = "Millennial", xvar = Am_Ox_Al) +
   scale_x_continuous("Oxalate Al (mg/kg)")
 
-p2 <- plot_fun_soil_prop(model = "Millennial", xvar = Am_Ox_Fe) +
+mil2 <- plot_fun_soil_prop(model = "Millennial", xvar = Am_Ox_Fe) +
   scale_x_continuous("Oxalate Fe (mg/kg)")
 
-p3 <- plot_fun_soil_prop(model = "Millennial", xvar = Caex) +
+mil3 <- plot_fun_soil_prop(model = "Millennial", xvar = Caex) +
   scale_x_continuous("exchangeable Ca (cmol/kg soil)")
 
-p4 <- plot_fun_soil_prop(model = "Millennial", xvar = Mgex) +
+mil4 <- plot_fun_soil_prop(model = "Millennial", xvar = Mgex) +
   scale_x_continuous("exchangeable Mg (cmol/kg soil)")
 
-p5 <- plot_fun_soil_prop(model = "Millennial", xvar = Naex) +
+mil5 <- plot_fun_soil_prop(model = "Millennial", xvar = Naex) +
   scale_x_continuous("exchangeable Na (cmol/kg soil)")
 
-p6 <- plot_fun_soil_prop(model = "Millennial", xvar = pH) +
+mil6 <- plot_fun_soil_prop(model = "Millennial", xvar = pH) +
   scale_x_continuous("pH")
 
-p7 <- plot_fun_soil_prop(model = "Millennial", xvar = Clay_63um) +
+mil7 <- plot_fun_soil_prop(model = "Millennial", xvar = Clay_63um) +
   scale_x_continuous("Clay < 63 um")
 
-p8 <- plot_fun_soil_prop(model = "Millennial", xvar = Clay_1_1) +
+mil8 <- plot_fun_soil_prop(model = "Millennial", xvar = Clay_1_1) +
   scale_x_continuous("1:1 clays (%)")
 
-p9 <- plot_fun_soil_prop(model = "Millennial",xvar = Clay_2_1) +
+mil9 <- plot_fun_soil_prop(model = "Millennial",xvar = Clay_2_1) +
   scale_x_continuous("2:1 clays (%)")
 
-ggpubr::ggarrange(p1, p2, p3, p4, p5, p6, p7, p8, p9)
-ggsave("./model_output/Bias_soil_prop_Millennial.jpeg", width = 12, height = 8)
+ggpubr::ggarrange(mil1, mil2, mil3, mil4, mil5, mil6, mil7, mil8, mil9)
+ggsave(paste0("./model_output/Bias_soil_prop_Millennial_",
+              Sys.Date(), ".jpeg"), width = 12, height = 8)
 ```
 
 #Plot bias vs forcing factors
 ```{r}
 #MIMICS
-p1 <- plot_fun_soil_prop(model = "MIMICS", xvar = npp_modis)
-p2 <- plot_fun_soil_prop(model = "MIMICS", xvar = Clay_2um)
-p3 <- plot_fun_soil_prop(model = "MIMICS", xvar = LIG_N)
-p4 <- plot_fun_soil_prop(model = "MIMICS", xvar = stemp)
-p5 <- plot_fun_soil_prop(model = "MIMICS", xvar = sm)
+mim1.1 <- plot_fun_soil_prop(model = "MIMICS", xvar = npp_modis)
+mim2.1 <- plot_fun_soil_prop(model = "MIMICS", xvar = Clay_2um)
+mim3.1 <- plot_fun_soil_prop(model = "MIMICS", xvar = LIG_N)
+mim4.1 <- plot_fun_soil_prop(model = "MIMICS", xvar = stemp)
+mim5.1 <- plot_fun_soil_prop(model = "MIMICS", xvar = sm)
 
 
-ggpubr::ggarrange(p1, p2, p3, p4, p5)
-ggsave("./model_output/Bias_forc_para_MIMICS.jpeg", width = 12, height = 8)
+ggpubr::ggarrange(mim1.1, mim2.1, mim3.1, mim4.1, mim5.1)
+ggsave(paste0("./model_output/Bias_forc_para_MIMICS_",
+              Sys.Date(), ".jpeg"), width = 12, height = 8)
+
+# Interactive plot
+plotly::ggplotly(mim2.1)
 
 #Millennial
-p1 <- plot_fun_soil_prop(model = "Millennial", xvar = pH)
-p2 <- plot_fun_soil_prop(model = "Millennial", xvar = bd_extracted)
-p3 <- plot_fun_soil_prop(model = "Millennial", xvar = Clay_63um)
-p4 <- plot_fun_soil_prop(model = "Millennial", xvar = stemp)
-p5 <- plot_fun_soil_prop(model = "Millennial", xvar = sm)
-p6 <- plot_fun_soil_prop(model = "Millennial", xvar = npp_modis)
+mil1.1 <- plot_fun_soil_prop(model = "Millennial", xvar = pH)
+mil2.1 <- plot_fun_soil_prop(model = "Millennial", xvar = bd_extracted)
+mil3.1 <- plot_fun_soil_prop(model = "Millennial", xvar = Clay_63um)
+mil4.1 <- plot_fun_soil_prop(model = "Millennial", xvar = stemp)
+mil5.1 <- plot_fun_soil_prop(model = "Millennial", xvar = sm)
+mil6.1 <- plot_fun_soil_prop(model = "Millennial", xvar = npp_modis)
 
 
-ggpubr::ggarrange(p1, p2, p3, p4, p5, p6)
-ggsave("./model_output/Bias_forc_para_Millennial.jpeg", width = 12, height = 8)
+ggpubr::ggarrange(mil1.1, mil2.1, mil3.1, mil4.1, mil5.1, mil6.1)
+ggsave(paste0("./model_output/Bias_forc_para_Millennial_",
+              Sys.Date(), ".jpeg"), width = 12, height = 8)
+
+# Interactive plot
+plotly::ggplotly(mil3.1)
+
 ```
 
 #Plot bias vs spatial
@@ -180,7 +198,7 @@ ggsave("./model_output/Bias_forc_para_Millennial.jpeg", width = 12, height = 8)
 plot_fun_spatial <- function(xvar){
   data_merged %>% 
     ggplot(aes(y = C_bias_kg_m2, x = {{xvar}})) +
-    geom_point(aes(color = Site)) +
+    geom_point(aes(color = Country_Site)) +
     scale_y_continuous("Pred - Obs SOC stocks ") +
     geom_smooth(method = "lm") +
     theme_bw(base_size = 14) +
@@ -192,13 +210,14 @@ p1 <- plot_fun_spatial(xvar = Latitude)
 p2 <- plot_fun_spatial(xvar = Longitude)
 
 ggpubr::ggarrange(p1, p2, nrow = 2)
-ggsave("./model_output/Bias_spatial_MIMICS_Millennial.jpeg", width = 12, height = 10)
+ggsave(paste0("./model_output/Bias_spatial_MIMICS_Millennial_",
+              Sys.Date(), ".jpeg"), width = 12, height = 10)
 
-data_merged %>% 
-  ggplot(aes(x = Longitude, y = Am_Ox_Al)) +
-  geom_point(aes(color = Site)) +
-  geom_smooth(method = "lm") +
-  theme_bw(base_size = 14) +
-  theme(legend.position = "none")
+# data_merged %>% 
+#   ggplot(aes(x = Longitude, y = Am_Ox_Al)) +
+#   geom_point(aes(color = Site)) +
+#   geom_smooth(method = "lm") +
+#   theme_bw(base_size = 14) +
+#   theme(legend.position = "none")
 
 ```
