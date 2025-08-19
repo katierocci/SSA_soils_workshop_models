@@ -23,7 +23,7 @@ library(caret)
 library(tibble)
 
 #load forcing data
-forcing_data <- read.csv("forcing_data/afsis_ref_updated6.csv", as.is=T)
+forcing_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T)
 
 #match MIMICS names
 forcing_data_MIMICS <- forcing_data %>% 
