@@ -23,7 +23,7 @@ library(Metrics)
 
 #Load model output data and merge with afsis data
 ```{r}
-model_out <- read.csv("./model_output/both_model_results_default_run.csv", row.names = 1) %>% 
+model_out <- read.csv("./model_output/both_model_results_default_run.csv", row.names = 1) %>%
   #rename SOC column
   dplyr::rename(C_stock_pred_kg_m2 = Soil_Organic_Carbon_kg_m2)
 
