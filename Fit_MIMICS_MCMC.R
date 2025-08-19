@@ -6,6 +6,13 @@
 # For local run
 #setwd("C:/Users/krocci/OneDrive - UCB-O365/Documents/MIMICS_HiRes")
 
+#################################################
+#load libraries needed outside of model code
+################################################
+library(tidyr)
+library(dplyr)
+library(caret)
+
 ########################################
 # Load forcing data
 ########################################
@@ -21,7 +28,19 @@ data <- forcing_data %>%
          theta_liq = SoilMoi_m3m3,
          Depth = Depth, SOC) %>%
   filter(Depth=='Topsoil')
-data.test <- data %>% sample_n(15)
+
+#partition training data
+proptrain = 0.8
+
+#Partitions data into training and test datasets
+set.seed(1)
+trainIndex <- createDataPartition(data$SOC, p = proptrain, list = FALSE, times = 1)
+obsTrain <- data[trainIndex,] %>% select(X,SOC)
+obsTest <- data[-trainIndex,] %>% select(X,SOC)
+obsFull <- data %>% select(X,SOC)
+
+dataTrain <- data[trainIndex,]
+dataTest <- data[-trainIndex,] %>% select(-SOC)
 
 
 ########################################
@@ -29,6 +48,12 @@ data.test <- data %>% sample_n(15)
 ########################################
 source("functions/MIMICS_MCMC_funcs/MIMICS_repeat_base.R")
 
+############################################
+#determine inital RMSE for training dataset
+#############################################
+MIMICS_afsis_train <- dataTrain %>% split(1:nrow(dataTrain)) %>% map(~ MIMICS_SP(df=.)) %>% bind_rows()
+Train_ModObs <- MIMICS_afsis_train %>% mutate(X=Site, SOC.mod = MICr+MICK+SOMp+SOMc+SOMa) %>% select(X,SOC.mod) %>% inner_join(obsTrain, by="X")
+RMSE_train <- sqrt(mean((Train_ModObs$SOC - Train_ModObs$SOC.mod)^2))
 
 ########################################
 # Set allowable min/max range for each MIMICS parameter
@@ -54,7 +79,7 @@ MCMC_out <- data.frame(i=0,
                        fPHYS_x=0.22,
                        slope=0,
                        r2=0,
-                       RMSE=3.5,
+                       RMSE=RMSE_train,
                        MICpropSOC=0,
                        LITpropSOC=0,
                        MIM_CO_Avg=0,
@@ -90,13 +115,13 @@ curr_p <- data.frame(Vslope_x = 1,
                      run_num=NA)
 
 # Set initial cost value (RMSE value to improve from)
-curr_cost <- 16.3 #RMSE value to improve upon
+curr_cost <- RMSE_train
 
 #Set trackers
 iters_wo_improve = 0
 
 #Set number of iterations for each parameter proposal 
-MIM_runs <- 5 #originally 200, 5 for testing
+MIM_runs <- 200 #originally 200
 
 # Send progress statement to console
 print(paste0("Running ", as.character(MIM_runs), " MCMC iterations"))
@@ -123,7 +148,7 @@ for(i in 1:MIM_runs) {
     
     
     #Run MIMICS ftn with test parameters
-    MIMout <- MIMrepeat(forcing_df = data.test, rparams = test_p)
+    MIMout <- MIMrepeat(forcing_df = dataTrain, rparams = test_p)
     
     #log parameter updates in dataframe
     iter_out <- data.frame(i=i,
@@ -243,10 +268,10 @@ pKint_x <- ggplot(MCMC_out, aes(x=iter, y=Kint_x)) + geom_line(color="grey50", a
 walk_plot <- grid.arrange(pRMSE, pr2, pTau_x, pCUE_x, pDesorb_x, pFPHYS_x, pVslope_x, pVint_x, pKslope_x, ncol = 2)
 
 
-MCMC_out_best <- MCMC_out%>%filter(MIM_CO_Avg != "Inf")
-hist(MCMC_out_best$RMSE)
-hist(MCMC_out_best$r2)
-MCMC_SingleBest <- MCMC_out %>% filter(iter==19& i==5)
+MCMC_out_improved <- MCMC_out%>%filter(improve == 1)
+hist(MCMC_out_improved$RMSE)
+hist(MCMC_out_improved$r2)
+MCMC_SingleBest <- MCMC_out %>% filter(iter==240 & i==80)
 
 #save plot
 ggsave(file=paste0("MCMC/Output/", format(Sys.time(), "%Y%m%d_%H%M%S_"), "MIM_MCMC_pCombos-", as.character(MIM_runs),"_walk_plot", ".jpeg"), 
@@ -257,6 +282,42 @@ ggsave(file=paste0("MCMC/Output/", format(Sys.time(), "%Y%m%d_%H%M%S_"), "MIM_MC
 #######################
 # Export MCMC run data
 #######################
-write.csv(MCMC_out, "AfSIS_MCMC_FirstTry.csv")
-write.csv(MCMC_SingleBest, "AfSIS_MCMC_Subset_Best.csv")
+write.csv(MCMC_out, "AfSIS_MCMC_Training.csv")
+write.csv(MCMC_SingleBest, "AfSIS_MCMC_Training_Best.csv")
+
+
+##################################
+#try parameters in test dataset and with full dataset
+#################################
+#default pset - before running, re-load source data to get orginal paramters back!
+MIMICS_afsis_test <- dataTest %>% split(1:nrow(dataTest)) %>% map(~ MIMICS_SP(df=.)) %>% bind_rows()
+Test_ModObs <- MIMICS_afsis_test %>% mutate(X=Site, SOC.mod = MICr+MICK+SOMp+SOMc+SOMa) %>% select(X,SOC.mod) %>% inner_join(obsTest, by="X")
+RMSE_test <- sqrt(mean((Test_ModObs$SOC - Test_ModObs$SOC.mod)^2)) #4.79
+
+#parameterized
+Tau_MULT <<- Tau_MULT*MCMC_SingleBest$Tau_x
+desorb_MULT <<- desorb_MULT*MCMC_SingleBest$desorb_x
+fPHYS_MULT <<- fPHYS_MULT*MCMC_SingleBest$fPHYS_x
+Vslope_MULT <<- Vslope_MULT*MCMC_SingleBest$Vslope_x
+Vint_MULT <<- Vint_MULT*MCMC_SingleBest$Vint_x
+Kslope_MULT <<- Kslope_MULT*MCMC_SingleBest$Kslope_x
+Kint_MULT <<- Kint_MULT*MCMC_SingleBest$Kint_x
+CUE_MULT <<- CUE_MULT*MCMC_SingleBest$CUE_x
+MIMICS_afsis_test_paramed <- dataTest %>% split(1:nrow(dataTest)) %>% map(~ MIMICS_SP(df=.)) %>% bind_rows()
+Test_ModObs_paramed <- MIMICS_afsis_test_paramed %>% mutate(X=Site, SOC.mod = MICr+MICK+SOMp+SOMc+SOMa) %>% select(X,SOC.mod) %>% inner_join(obsTest, by="X")
+RMSE_test_paramed <- sqrt(mean((Test_ModObs_paramed$SOC - Test_ModObs_paramed$SOC.mod)^2)) #3.69
+
+#full dataset
+MIMICS_afsis_full <- data %>% split(1:nrow(data)) %>% map(~ MIMICS_SP(df=.)) %>% bind_rows()
+ModObs_full <- MIMICS_afsis_full %>% mutate(X=Site, SOC.mod = MICr+MICK+SOMp+SOMc+SOMa) %>% select(X,SOC.mod) %>% inner_join(obsFull, by="X")
+RMSE_full_paramed <- sqrt(mean((ModObs_full$SOC - ModObs_full$SOC.mod)^2)) #3.95
+lm_mimics_paramed <- lm(SOC ~ SOC.mod, data = ModObs_full)
+summary(lm_mimics_paramed) #r2=0.066
+ggplot(data=ModObs_full, aes(x = SOC.mod, y = SOC)) +
+  geom_point() +
+  scale_x_continuous("Predicted SOC (kg/m2)", expand = c(0,0)) +
+  scale_y_continuous("Observed SOC (kg/m2)", expand = c(0,0)) +
+  geom_abline(slope = 1) +
+  geom_smooth(method = "lm") +
+  theme_bw(base_size = 16)
 

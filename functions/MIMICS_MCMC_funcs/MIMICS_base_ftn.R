@@ -91,6 +91,13 @@ psMethod='clay' #'clay' and 'metal' accepted - not extensively tested!
 Tau_MULT = 1
 desorb_MULT = 1
 fPHYS_MULT = 1
+Vslope_MULT = 1
+Vint_MULT = 1
+Kslope_MULT = 1
+Kint_MULT = 1
+vMOD_MULT = 1
+kMOD_MULT = 1
+CUE_MULT = 1
 
 
 ########################################
@@ -316,7 +323,7 @@ MIMICS_SP <- function(df){
   MIMLIT    <- (test[[1]][[1]]+test[[1]][[2]])  * depth *1e4 / 1e6 #convert kgC/m2 from mgC/cm3 (0-30 cm) 
   MIMMIC    <- (test[[1]][[3]]+test[[1]][[4]])  * depth *1e4 / 1e6
   MIM_CO    <-  test[[1]][[3]]/test[[1]][[4]]
-  MIMSOC    <- sum(test[[1]])  * depth *1e4 / 1e6   
+  MIMSOC    <- (test[[1]][[3]]+test[[1]][[4]]+test[[1]][[5]]+test[[1]][[6]]+test[[1]][[7]])  * depth *1e4 / 1e6   
   
   table <- as.numeric(test[[1]])
   
