@@ -119,7 +119,7 @@ ggplot(MIMICS_ss_AllSites) +
 #Run Millennial at AfSIS sites
 ```{r}
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
-parameters.file <- read.table(here("parameters/soilpara_in_fit.txt"))
+parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA.txt"))
 parameters <- as.list(parameters.file$V2)
 names(parameters) <- parameters.file$V1
 

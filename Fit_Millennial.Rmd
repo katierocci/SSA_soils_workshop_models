@@ -15,17 +15,19 @@ library(dplyr)
 library(tidyr)
 
 ##load forcing data
-forcing_data <- read.csv("forcing_data/afsis_ref_updated6.csv", as.is=T)
-forcing_data <- forcing_data[,-c(1,3)] # Fix for first column name import error
+forcing_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T)
+forcing_data <- forcing_data[,-c(1,2,4)] # Fix for first column name import error
 
 forcing_data_Millennial <- forcing_data %>% 
                                    drop_na(Litterfall.gC.m2.yr, NPP.gC.m2.d, Clay_2um, Clay_63um, SoilTMP_C, SoilMoi_m3m3, pH, bd_extracted, LIG_N) %>%
+  mutate(npp_modis_gC.m2.yr = npp_modis*1000) %>% 
+  mutate(forc_npp = npp_modis_gC.m2.yr/365) %>% 
                                    dplyr::select(param_pH = pH,
                                    param_bulkd = bd_extracted, 
                                    param_claysilt = Clay_63um, 
-                                   forc_st = SoilTMP_C, 
-                                   forc_sw = SoilMoi_m3m3, 
-                                   forc_npp = NPP.gC.m2.d,
+                                   forc_st = stemp, 
+                                   forc_sw = sm, 
+                                   forc_npp,
                                    Latitude,
                                    Longitude,
                                    Depth,
@@ -96,50 +98,11 @@ rescale_multiply_restore <- function(x, factor = 1.5) {
 
 #Parameters to fit
 ```{r}
-parToFit.pools <- c(param_pc = parameters$param_pc, #sorption
-                    alpha_pl = parameters$alpha_pl, #Vmax
-                    eact_pl = parameters$eact_pl, #Vmax
-                    ##alpha_lb = parameters$alpha_lb, #Vmax
-                    ##eact_lb = parameters$eact_lb, #Vmax
-                    kaff_pl = parameters$kaff_pl, #Km
-                    cue_ref = parameters$cue_ref, #CUE
-                    param_p1 = parameters$param_p1, #sorption
-                    ##kaff_lb = parameters$kaff_lb, #Km
-                    rate_bd = parameters$rate_bd, #microbial turnover
-                    param_pb = parameters$param_pb #fraction turnover partition to MAOM
-) 
-
-parToFit.pools <- c(eact_pl = parameters$eact_pl, alpha_pl = parameters$alpha_pl)
+parToFit.pools <- c(eact_pl = parameters$eact_pl, alpha_pl = parameters$alpha_pl, tae_ref = parameters$tae_ref)
 
 parToFit.lower <- parToFit.pools*0.5
-#parToFit.lower <- rescale_multiply_restore(parToFit.pools, factor=0.5)
-# parToFit.lower <- c(param_pc = 0, #sorption
-#                     alpha_pl = 0, #Vmax
-#                     eact_pl = 0, #Vmax
-#                     #alpha_lb = 0, #Vmax
-#                     #eact_lb = 0, #Vmax
-#                     kaff_pl = 0, #Km
-#                     cue_ref = 0, #CUE
-#                     param_p1 = 0, #sorption
-#                     #kaff_lb = 0, #Km
-#                     rate_bd = 0, #microbial turnover
-#                     param_pb = 0 #fraction turnover partition to MAOM
-# ) 
-# 
+
 parToFit.upper <- parToFit.pools*1.5
-#parToFit.upper <- rescale_multiply_restore(parToFit.pools, factor=1.5)
-# parToFit.upper <- c(param_pc = Inf, #sorption
-#                     alpha_pl = Inf, #Vmax
-#                     eact_pl = Inf, #Vmax
-#                     #alpha_lb = Inf, #Vmax
-#                     #eact_lb = Inf, #Vmax
-#                     kaff_pl = Inf, #Km
-#                     cue_ref = 1, #CUE
-#                     param_p1 = Inf, #sorption
-#                     #kaff_lb = Inf, #Km
-#                     rate_bd = Inf, #microbial turnover
-#                     param_pb = 1 #fraction turnover partition to MAOM
-#) 
 ```
 
 #Define cost function
@@ -156,12 +119,13 @@ Objective.pools <- function(x, parset = names(x)) {
 ```{r}
 start_time = Sys.time()
 # Fit the model
+set.seed(123)
 Fit.pools <- modFit(
   f = Objective.pools,
   p = parToFit.pools,
   lower = parToFit.lower,
   upper = parToFit.upper,
-  method = "BFGS", #BFGS #Marq
+  method = "Marq", #BFGS #Marq
   jac = NULL,
   control = list(
     ftol = 1e-06,
@@ -173,6 +137,7 @@ Fit.pools <- modFit(
 )
 end_time = Sys.time()
 fit.time <- end_time - start_time
+fit.time
 
 # Save the best parameters as a table
 outtab <- cbind(Fit.pools$par, parToFit.lower, parToFit.pools, parToFit.upper)
@@ -182,11 +147,44 @@ write.csv(outtab, file= here("parameter_fit_SSA.csv"))
 
 #Cross-validation on testing set
 ```{r}
+#Get best parameters
+parameters[names(parToFit.pools)] <- Fit.pools$par
+#Calculate model pools at testing sites
+optim.test <- Solve_Model_for_Fit(inputsTest, parameters)
 
+#Calculate model performance indices
+##Bias is modeled - observed
+fit.SOM <- summary(lm(optim.test[1:dim(inputsTest)[1],]$Soil_Organic_Carbon_kg_m2 ~ obsTest$Soil_Organic_Carbon_kg_m2))
+SOM.bias <- optim.test[1:dim(inputsTest)[1],]$Soil_Organic_Carbon_kg_m2 - obsTest$Soil_Organic_Carbon_kg_m2
+dim.SOM <- dim(inputsTest)[1]
+RMSE_kg <- sqrt(sum((obsTest$Soil_Organic_Carbon_kg_m2- optim.test[1:dim.SOM,]$Soil_Organic_Carbon_kg_m2)^2, na.rm=T)/dim.SOM)
+AIC <- dim.SOM * log(sum((obsTest$Soil_Organic_Carbon_kg_m2- optim.test[1:dim.SOM,]$Soil_Organic_Carbon_kg_m2)^2, na.rm=T)/dim.SOM) + 2*length(parameters[[3]])
+MBE_SOM <- mean(SOM.bias, na.rm=T)
+MAE_SOM <- mean(abs(SOM.bias), na.rm=T)
+print(list(RMSE_kg = RMSE_kg,AIC = AIC, MAE_SOM = MAE_SOM, MBE_SOM = MBE_SOM, fit.SOM= fit.SOM))
+write.csv(as.data.frame(unlist(list(FitPars = Fit.pools$par, RMSE_kg = RMSE_kg,AIC = AIC, MAE_SOM = MAE_SOM, MBE_SOM = MBE_SOM, df1= fit.SOM$fstatistic[2], df2= fit.SOM$fstatistic[3], Fstat=fit.SOM$fstatistic[1], adjR2=fit.SOM$adj.r.squared))), file=paste0("ParFitResult_",Sys.time(),".csv"))
 ```
 
-#Model performance indices
+#Run Best Parameters
 ```{r}
+# Recover the optimized parameters and plot the results
+start_time = Sys.time()
 
+parameters[names(parToFit.pools)] <- Fit.pools$par
+optim.pools <- Solve_Model_for_Fit(forcing_data_Millennial, parameters)
+
+end_time = Sys.time()
+optim.time <- end_time - start_time
+
+ymax_plot <- ceiling(max(max(SOC_obs$Soil_Organic_Carbon_kg_m2, na.rm=T), max(optim.pools$Soil_Organic_Carbon_kg_m2, na.rm=T)))
+ymax_plot <- ifelse(ymax_plot>100, 20, ymax_plot)
+
+#pdf(file="fit_Millennial_AfSIS.pdf", height=4, width=4)
+par(mfrow = c(1,1))
+par(mar = c(3.5,3.7,0,0)+.9)
+par(oma = c(0,0,0,0))
+plot(optim.pools$Soil_Organic_Carbon_kg_m2, SOC_obs$Soil_Organic_Carbon_kg_m2, ylab = expression("Observed OM (kg " ~ m^{2} ~ ")"), xlab = expression("Predicted OM (kg " ~ m^{2} ~ ")"), lwd = 2, type = "p", col = "black", ylim=c(0,ymax_plot), xlim=c(0,ymax_plot))
+legend("topright", c("SOM"), col=c("black"), pch=16)
+#dev.off()
 ```
 
