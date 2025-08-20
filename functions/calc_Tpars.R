@@ -42,8 +42,8 @@ calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA, AlFe=
   
   # For historic MAT dependent kinetics
   if (historic==TRUE) {
-    Vslope = Vslope + (MAT*0.00104) 
-    Vint = Vint - (MAT*0.0228) 
+    Vslope = Vslope + (MAT*0.00104)
+    Vint = Vint - (MAT*0.0228)
   }
   
 
@@ -64,8 +64,8 @@ calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA, AlFe=
   }
   
   # ------------ calculate time varying parameters ---------------
-  Vmax     <- exp(TSOI * Vslope + Vint) * aV * fW   #<-- Moisture scalar applied
-  Km       <- exp(TSOI * Kslope + Kint) * aK
+  Vmax     <- exp(TSOI * (Vslope * Vslope_MULT) + (Vint * Vint_MULT)) * aV * fW   #<-- Moisture scalar applied
+  Km       <- exp(TSOI * (Kslope * Kslope_MULT) + (Kint * Kint_MULT)) * aK
   
   if (tauMethod == 'NPP') {
     Tau_MOD1 <- sqrt(ANPP/Tau_MOD[1])         
@@ -107,13 +107,15 @@ calc_Tpars_Conly <- function(ANPP, fCLAY, TSOI, MAT=NA, CN, LIG, LIG_N=NA, AlFe=
     pSCALAR  <- PHYS_scalar[1] * exp(PHYS_scalar[2]*(sqrt(fMETAL)))  #Scalar for texture effects on SOMp
   }
   
+  CUE = CUE * CUE_MULT
+  
   v_MOD    <- vMOD  
   k_MOD    <- kMOD 
   k_MOD[3] <- k_MOD[3] * pSCALAR    
   k_MOD[6] <- k_MOD[6] * pSCALAR    
   
-  VMAX     <- Vmax * v_MOD 
-  KM       <- Km / k_MOD
+  VMAX     <- Vmax * v_MOD * vMOD_MULT
+  KM       <- Km / (k_MOD * kMOD_MULT)
   
   I       <- array(NA, dim=2)             
   I[1]    <- (EST_LIT / depth) * fMET     

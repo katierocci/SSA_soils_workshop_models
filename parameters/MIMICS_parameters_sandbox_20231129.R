@@ -5,7 +5,7 @@ Vslope  <- rep(0.063, 6)
 Vint    <- rep(5.47, 6)
 aV      <-rep(0.000008, 6)
 Kslope  <- rep(c(0.025, 0.035, 0.025),2)
-Kint    <- rep(3.19, 6)
+Kint    <- rep(3.19, 6)*1
 aK      <- rep(10, 6)
 vMOD    <- c(10, 2, 10, 3, 3, 2)
 kMOD    <- c(8, 2, 4, 2, 4, 6)
@@ -41,8 +41,14 @@ desorbMethod='clay' #'clay' and 'metal' accepted - not extensively tested!
 psMethod='clay' #'clay' and 'metal' accepted - not extensively tested!
 
 #Set default multipliers
-Tau_MULT = 1
-desorb_MULT = 1
-fPHYS_MULT = 1
-
+Tau_MULT = 1#*1.1723
+desorb_MULT = 1#*0.2273
+fPHYS_MULT = 1#*0.0840
+Vslope_MULT = 1#*2.0523
+Vint_MULT = 1#*0.9892
+Kslope_MULT = 1#*1.0279
+Kint_MULT = 1
+vMOD_MULT = 1
+kMOD_MULT = 1
+CUE_MULT = 1#*1
 
