@@ -18,14 +18,14 @@ library(caret)
 ########################################
 forcing_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T)
 data <- forcing_data %>% 
-  drop_na(Litterfall.gC.m2.yr, pH, Clay_2um, LIG_N, SoilTMP_C, SoilMoi_m3m3, NPP.gC.m2.d, Clay_63um, bd_extracted)  %>% 
+  drop_na(npp_modis, pH, Clay_2um, LIG_N, stemp, sm, NPP.gC.m2.d, Clay_63um, bd_extracted)  %>% 
   filter(CORG <=20) %>%
-  mutate(SOC = CORG*10*bd_extracted*20/100) %>%
-  select(X, ANPP = Litterfall.gC.m2.yr, 
+  mutate(SOC = CORG*10*bd_extracted*20/100,npp_modis.gC.m2.yr=npp_modis*1000) %>%
+  select(X, ANPP=npp_modis.gC.m2.yr,
          CLAY = Clay_2um,
          lig_N = LIG_N,
-         TSOI = SoilTMP_C,
-         theta_liq = SoilMoi_m3m3,
+         TSOI = stemp,
+         theta_liq = sm,
          Depth = Depth, SOC) %>%
   filter(Depth=='Topsoil')
 
@@ -54,6 +54,10 @@ source("functions/MIMICS_MCMC_funcs/MIMICS_repeat_base.R")
 MIMICS_afsis_train <- dataTrain %>% split(1:nrow(dataTrain)) %>% map(~ MIMICS_SP(df=.)) %>% bind_rows()
 Train_ModObs <- MIMICS_afsis_train %>% mutate(X=Site, SOC.mod = MICr+MICK+SOMp+SOMc+SOMa) %>% select(X,SOC.mod) %>% inner_join(obsTrain, by="X")
 RMSE_train <- sqrt(mean((Train_ModObs$SOC - Train_ModObs$SOC.mod)^2))
+lm_train <- lm(Train_ModObs$SOC ~ Train_ModObs$SOC.mod, data = Train_ModObs)
+lm_train_sum <- summary(lm_train)
+r2_train <- lm_train_sum$adj.r.squared
+max_RMSE=100
 
 ########################################
 # Set allowable min/max range for each MIMICS parameter
@@ -78,7 +82,7 @@ MCMC_out <- data.frame(i=0,
                        desorb_x=0.17,
                        fPHYS_x=0.22,
                        slope=0,
-                       r2=0,
+                       r2=r2_train,
                        RMSE=RMSE_train,
                        MICpropSOC=0,
                        LITpropSOC=0,
@@ -115,7 +119,7 @@ curr_p <- data.frame(Vslope_x = 1,
                      run_num=NA)
 
 # Set initial cost value (RMSE value to improve from)
-curr_cost <- RMSE_train
+curr_cost <- (RMSE_train/max_RMSE) - r2_train
 
 #Set trackers
 iters_wo_improve = 0
@@ -171,7 +175,7 @@ for(i in 1:MIM_runs) {
                            improve=0)
     
     #Make decision based on cost outcome
-    if(MIMout$RMSE < curr_cost &&
+    if(((MIMout$RMSE/max_RMSE)-MIMout$r2) < curr_cost &&
        MIMout$MICpropSOC > 0.01 &&
        MIMout$MICpropSOC < 0.08 &&
        MIMout$LITpropSOC > 0.05 &&
@@ -184,12 +188,12 @@ for(i in 1:MIM_runs) {
       
       #Update targets
       curr_p <- test_p
-      curr_cost <- MIMout$RMSE
+      curr_cost <- (MIMout$RMSE/max_RMSE)-MIMout$r2
       iter_out$improve <- 1
       iters_wo_improve <- 0
       
       # Print to console
-      print(paste0("IMPROVED RMSE TO ", round(MIMout$RMSE,2)))
+      print(paste0("IMPROVED COST TO ", round(curr_cost,4)))
       
       ## Walk proposal distributions 
       # ONLY USEFUL IF COMPUTATIONAL POWER IS LIMITED, comment out if not
@@ -268,10 +272,10 @@ pKint_x <- ggplot(MCMC_out, aes(x=iter, y=Kint_x)) + geom_line(color="grey50", a
 walk_plot <- grid.arrange(pRMSE, pr2, pTau_x, pCUE_x, pDesorb_x, pFPHYS_x, pVslope_x, pVint_x, pKslope_x, ncol = 2)
 
 
-MCMC_out_improved <- MCMC_out%>%filter(improve == 1)
+MCMC_out_improved <- MCMC_out%>%filter(improve == 1) %>%mutate(cost = (RMSE/100)-r2)
 hist(MCMC_out_improved$RMSE)
 hist(MCMC_out_improved$r2)
-MCMC_SingleBest <- MCMC_out %>% filter(iter==240 & i==80)
+MCMC_SingleBest <- MCMC_out %>% filter(iter==351 & i==117)
 
 #save plot
 ggsave(file=paste0("MCMC/Output/", format(Sys.time(), "%Y%m%d_%H%M%S_"), "MIM_MCMC_pCombos-", as.character(MIM_runs),"_walk_plot", ".jpeg"), 
@@ -282,7 +286,7 @@ ggsave(file=paste0("MCMC/Output/", format(Sys.time(), "%Y%m%d_%H%M%S_"), "MIM_MC
 #######################
 # Export MCMC run data
 #######################
-write.csv(MCMC_out, "AfSIS_MCMC_Training.csv")
+write.csv(MCMC_out, "AfSIS_MCMC_Training_UpdatedInputs.csv")
 write.csv(MCMC_SingleBest, "AfSIS_MCMC_Training_Best.csv")
 
 
@@ -293,6 +297,9 @@ write.csv(MCMC_SingleBest, "AfSIS_MCMC_Training_Best.csv")
 MIMICS_afsis_test <- dataTest %>% split(1:nrow(dataTest)) %>% map(~ MIMICS_SP(df=.)) %>% bind_rows()
 Test_ModObs <- MIMICS_afsis_test %>% mutate(X=Site, SOC.mod = MICr+MICK+SOMp+SOMc+SOMa) %>% select(X,SOC.mod) %>% inner_join(obsTest, by="X")
 RMSE_test <- sqrt(mean((Test_ModObs$SOC - Test_ModObs$SOC.mod)^2)) #4.79
+lm_test <- lm(Test_ModObs$SOC ~ Test_ModObs$SOC.mod, data = Test_ModObs)
+lm_test_sum <- summary(lm_test)
+r2_test <- lm_test_sum$adj.r.squared
 
 #parameterized
 Tau_MULT <<- Tau_MULT*MCMC_SingleBest$Tau_x
@@ -306,11 +313,14 @@ CUE_MULT <<- CUE_MULT*MCMC_SingleBest$CUE_x
 MIMICS_afsis_test_paramed <- dataTest %>% split(1:nrow(dataTest)) %>% map(~ MIMICS_SP(df=.)) %>% bind_rows()
 Test_ModObs_paramed <- MIMICS_afsis_test_paramed %>% mutate(X=Site, SOC.mod = MICr+MICK+SOMp+SOMc+SOMa) %>% select(X,SOC.mod) %>% inner_join(obsTest, by="X")
 RMSE_test_paramed <- sqrt(mean((Test_ModObs_paramed$SOC - Test_ModObs_paramed$SOC.mod)^2)) #3.69
+lm_test_paramed <- lm(Test_ModObs_paramed$SOC ~ Test_ModObs_paramed$SOC.mod, data = Test_ModObs_paramed)
+lm_test_sum_paramed <- summary(lm_test_paramed)
+r2_test_paramed <- lm_test_sum_paramed$adj.r.squared
 
 #full dataset
 MIMICS_afsis_full <- data %>% split(1:nrow(data)) %>% map(~ MIMICS_SP(df=.)) %>% bind_rows()
 ModObs_full <- MIMICS_afsis_full %>% mutate(X=Site, SOC.mod = MICr+MICK+SOMp+SOMc+SOMa) %>% select(X,SOC.mod) %>% inner_join(obsFull, by="X")
-RMSE_full_paramed <- sqrt(mean((ModObs_full$SOC - ModObs_full$SOC.mod)^2)) #3.95
+RMSE_full_paramed <- sqrt(mean((ModObs_full$SOC - ModObs_full$SOC.mod)^2)) #4.62
 lm_mimics_paramed <- lm(SOC ~ SOC.mod, data = ModObs_full)
 summary(lm_mimics_paramed) #r2=0.066
 ggplot(data=ModObs_full, aes(x = SOC.mod, y = SOC)) +

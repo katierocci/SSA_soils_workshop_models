@@ -38,35 +38,64 @@ source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
 #Load forcing data
 ```{r}
 ##load forcing data
-forcing_data <- read.csv("forcing_data/afsis_ref_updated6.csv", as.is=T)
+forcing_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T)
 forcing_data<- forcing_data[,-1]
 colnames(forcing_data)[1] <- "Set"  # Fix for first column name import error
 
 #match MIMICS names
-forcing_data_MIMICS <- forcing_data %>% select(Set, ANPP = Litterfall.gC.m2.yr, 
+forcing_data_MIMICS <- forcing_data %>% mutate(npp_modis.gC.m2.yr=npp_modis*1000) %>%
+    drop_na(npp_modis.gC.m2.yr, pH, Clay_2um, LIG_N, stemp, sm, Clay_63um, bd_extracted) %>%
+                                               select(Set, ANPP = npp_modis.gC.m2.yr, 
                                                CLAY = Clay_2um,
                                                lig_N = LIG_N,
-                                               TSOI = SoilTMP_C,
-                                               theta_liq = SoilMoi_m3m3,
-                                               Depth = Depth) %>% 
-  drop_na(ANPP, CLAY, lig_N, TSOI, theta_liq)  %>% 
+                                               TSOI = stemp,
+                                               theta_liq = sm,
+                                               Depth = Depth) %>%
   filter(Depth=='Topsoil')
 
 #Select site-level parameters and input data from AfSIS data
-forcing_data_Millennial <- forcing_data %>% dplyr::select(Set, param_pH = pH, 
+forcing_data_Millennial <- forcing_data %>% mutate(npp_modis.gC.m2.d=npp_modis*1000/365) %>%
+  drop_na(npp_modis.gC.m2.d, pH, Clay_2um, LIG_N, stemp, sm, Clay_63um, bd_extracted) %>%
+                                dplyr::select(Set, param_pH = pH, 
                                    param_bulkd = bd_extracted, 
                                    param_claysilt = Clay_63um, 
-                                   forc_st = SoilTMP_C, 
-                                   forc_sw = SoilMoi_m3m3, 
-                                   forc_npp = NPP.gC.m2.d,
+                                   forc_st = stemp, 
+                                   forc_sw = sm, 
+                                   forc_npp = npp_modis.gC.m2.d,
                                    Latitude = Latitude,
                                    Longitude = Longitude,
                                    SSN = SSN,
                                    Depth = Depth) %>% 
                             mutate(param_bulkd = param_bulkd*1000*0.2, param_pc = 0.86, #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
                                    site_id = row_number()) %>% 
-                                  filter(Depth == "Topsoil") %>%
-                                  na.omit()
+                                  filter(Depth == "Topsoil")
+
+
+#OLD - match MIMICS names
+#forcing_data_MIMICS_OLD <- forcing_data %>% select(Set, ANPP = Litterfall.gC.m2.yr, 
+#                                               CLAY = Clay_2um,
+#                                               lig_N = LIG_N,
+#                                               TSOI = SoilTMP_C,
+#                                               theta_liq = SoilMoi_m3m3,
+#                                               Depth = Depth) %>% 
+#  drop_na(ANPP, CLAY, lig_N, TSOI, theta_liq)  %>% 
+#  filter(Depth=='Topsoil')
+
+#OLD - Select site-level parameters and input data from AfSIS data
+#forcing_data_Millennial_OLD <- forcing_data %>% dplyr::select(Set, param_pH = pH, 
+#                                   param_bulkd = bd_extracted, 
+#                                   param_claysilt = Clay_63um, 
+#                                   forc_st = SoilTMP_C, 
+#                                   forc_sw = SoilMoi_m3m3, 
+#                                   forc_npp = NPP.gC.m2.d,
+#                                   Latitude = Latitude,
+#                                   Longitude = Longitude,
+#                                   SSN = SSN,
+#                                   Depth = Depth) %>% 
+#                            mutate(param_bulkd = param_bulkd*1000*0.2, param_pc = 0.86, #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
+#                                   site_id = row_number()) %>% 
+#                                  filter(Depth == "Topsoil") %>%
+#                                  na.omit()
 ```
 
 
@@ -155,3 +184,199 @@ both_models <- full_join(MIMICS_ss_AllSites %>% select(Set = SET, Soil_Organic_C
 
 ggplot(both_models, aes(x=Soil_Organic_Carbon_kg_m2)) + geom_histogram(bins = 30, fill = "steelblue", color = "white") + facet_wrap(~ Type, ncol = 1)
 ```
+
+#combine model output and afsis data
+```{r}
+Set.SSN <- forcing_data_Millennial %>% select(Set, SSN)
+
+model_out <- both_models %>% 
+  dplyr::rename(C_stock_pred_kg_m2 = Soil_Organic_Carbon_kg_m2) %>% filter(Type != "Observed") %>%
+  select(Type, Set, C_stock_pred_kg_m2) %>% inner_join(Set.SSN, by="Set")
+
+afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T, , row.names = 1) %>% 
+  dplyr::select(SSN, Site, Cluster, Plot, Country, Longitude, Latitude,
+                Clay_2um, Clay_8um, Clay_63um, LIG_N, stemp, sm,
+                Depth, CORG, pH, bd_extracted, npp_modis,
+                Am_Ox_Al, Am_Ox_Fe, Caex, Mgex, Naex, Clay_1_1, Clay_2_1, VegStructure) %>% 
+  unite("Country_Site", Country, Site, remove = FALSE) %>% 
+  filter(Depth == "Topsoil",
+         CORG <= 20) %>% 
+  drop_na() %>% 
+  #Calculate SOC stocks for observational data (kg/m2)
+  mutate(C_stock_obs_kg_m2 = ((CORG/100)*bd_extracted*20)*10)
+
+data_merged <- model_out %>% 
+  full_join(afsis_data) %>% 
+  #calculate bias
+  mutate(C_bias_kg_m2 = C_stock_pred_kg_m2 - C_stock_obs_kg_m2)
+```
+
+#Plot predicted vs observed for both models
+```{r}
+pred_obs <- data_merged %>%
+  ggplot(aes(x = C_stock_pred_kg_m2, y = C_stock_obs_kg_m2)) +
+  geom_point(aes(color = Country_Site)) +
+  scale_x_continuous("Predicted SOC (kg/m2)", expand = c(0,0)) +
+  scale_y_continuous("Observed SOC (kg/m2)", expand = c(0,0)) +
+  geom_abline(slope = 1) +
+  geom_smooth(method = "lm") +
+  theme_bw(base_size = 16) +
+  theme(legend.position = "none") +
+  facet_wrap(~Type, scales = "free_x")
+pred_obs
+ggsave(paste0("./model_output/Pred_Obs_BothModels_",
+              Sys.Date(), ".jpeg"), width = 12, height = 6)
+
+# Interactive plot
+# plotly::ggplotly(pred_obs)
+
+lm_mimics <- lm(C_stock_obs_kg_m2 ~ C_stock_pred_kg_m2, 
+                data = data_merged %>% filter(Type == "MIMICS"))
+
+summary(lm_mimics)
+data_MIMICS = data_merged %>% filter(Type == "MIMICS")
+RMSE_MIMICS = sqrt(mean((data_MIMICS$C_stock_obs_kg_m2 - data_MIMICS$C_stock_pred_kg_m2)^2))
+
+
+lm_millennial <- lm(C_stock_obs_kg_m2 ~ C_stock_pred_kg_m2, 
+                    data = data_merged %>% filter(Type == "Millennial"))
+
+summary(lm_millennial)
+data_Mill = data_merged %>% filter(Type == "Millennial")
+RMSE_Mill = sqrt(mean((data_Mill$C_stock_obs_kg_m2 - data_Mill$C_stock_pred_kg_m2)^2))
+```
+
+#Plot model bias against selected soil properties
+```{r}
+plot_fun_soil_prop <- function(xvar, model){
+  data_merged %>% 
+    filter(Type == {{model}}) %>% 
+    ggplot(aes(y = C_bias_kg_m2, x = {{xvar}})) +
+    geom_point(aes(color = Country_Site)) +
+    scale_y_continuous("Pred - Obs SOC stocks ") +
+    geom_smooth(method = "lm") +
+    theme_bw(base_size = 14) +
+    theme(legend.position = "none")
+}
+
+#MIMICS
+mim1 <- plot_fun_soil_prop(model = "MIMICS", xvar = Am_Ox_Al) +
+  scale_x_continuous("Oxalate Al (mg/kg)")
+
+mim2 <- plot_fun_soil_prop(model = "MIMICS", xvar = Am_Ox_Fe) +
+  scale_x_continuous("Oxalate Fe (mg/kg)")
+
+mim3 <- plot_fun_soil_prop(model = "MIMICS", xvar = Caex) +
+  scale_x_continuous("exchangeable Ca (cmol/kg soil)")
+
+mim4 <- plot_fun_soil_prop(model = "MIMICS", xvar = Mgex) +
+  scale_x_continuous("exchangeable Mg (cmol/kg soil)")
+
+mim5 <- plot_fun_soil_prop(model = "MIMICS", xvar = pH) +
+  scale_x_continuous("pH")
+
+mim6 <- plot_fun_soil_prop(model = "MIMICS", xvar = Clay_63um) +
+  scale_x_continuous("Clay < 63 um")
+
+mim7 <- plot_fun_soil_prop(model = "MIMICS", xvar = Clay_1_1) +
+  scale_x_continuous("1:1 clays (%)")
+
+mim8 <- plot_fun_soil_prop(model = "MIMICS",xvar = Clay_2_1) +
+  scale_x_continuous("2:1 clays (%)")
+
+ggpubr::ggarrange(mim1, mim2, mim3, mim4, mim5, mim6, mim7, mim8)
+ggsave(paste0("./model_output/Bias_soil_prop_MIMICS_",
+              Sys.Date(), ".jpeg"), width = 12, height = 8)
+
+#Millennial
+mil1 <- plot_fun_soil_prop(model = "Millennial", xvar = Am_Ox_Al) +
+  scale_x_continuous("Oxalate Al (mg/kg)")
+
+mil2 <- plot_fun_soil_prop(model = "Millennial", xvar = Am_Ox_Fe) +
+  scale_x_continuous("Oxalate Fe (mg/kg)")
+
+mil3 <- plot_fun_soil_prop(model = "Millennial", xvar = Caex) +
+  scale_x_continuous("exchangeable Ca (cmol/kg soil)")
+
+mil4 <- plot_fun_soil_prop(model = "Millennial", xvar = Mgex) +
+  scale_x_continuous("exchangeable Mg (cmol/kg soil)")
+
+mil5 <- plot_fun_soil_prop(model = "Millennial", xvar = pH) +
+  scale_x_continuous("pH")
+
+mil6 <- plot_fun_soil_prop(model = "Millennial", xvar = Clay_63um) +
+  scale_x_continuous("Clay < 63 um")
+
+mil7 <- plot_fun_soil_prop(model = "Millennial", xvar = Clay_1_1) +
+  scale_x_continuous("1:1 clays (%)")
+
+mil8 <- plot_fun_soil_prop(model = "Millennial",xvar = Clay_2_1) +
+  scale_x_continuous("2:1 clays (%)")
+
+ggpubr::ggarrange(mil1, mil2, mil3, mil4, mil5, mil6, mil7, mil8)
+ggsave(paste0("./model_output/Bias_soil_prop_Millennial_",
+              Sys.Date(), ".jpeg"), width = 12, height = 8)
+```
+
+#Plot bias vs forcing factors
+```{r}
+#MIMICS
+mim1.1 <- plot_fun_soil_prop(model = "MIMICS", xvar = npp_modis)
+mim2.1 <- plot_fun_soil_prop(model = "MIMICS", xvar = Clay_2um)
+mim3.1 <- plot_fun_soil_prop(model = "MIMICS", xvar = LIG_N)
+mim4.1 <- plot_fun_soil_prop(model = "MIMICS", xvar = stemp)
+mim5.1 <- plot_fun_soil_prop(model = "MIMICS", xvar = sm)
+
+
+ggpubr::ggarrange(mim1.1, mim2.1, mim3.1, mim4.1, mim5.1)
+ggsave(paste0("./model_output/Bias_forc_para_MIMICS_",
+              Sys.Date(), ".jpeg"), width = 12, height = 8)
+
+# Interactive plot
+plotly::ggplotly(mim2.1)
+
+#Millennial
+mil1.1 <- plot_fun_soil_prop(model = "Millennial", xvar = pH)
+mil2.1 <- plot_fun_soil_prop(model = "Millennial", xvar = bd_extracted)
+mil3.1 <- plot_fun_soil_prop(model = "Millennial", xvar = Clay_63um)
+mil4.1 <- plot_fun_soil_prop(model = "Millennial", xvar = stemp)
+mil5.1 <- plot_fun_soil_prop(model = "Millennial", xvar = sm)
+mil6.1 <- plot_fun_soil_prop(model = "Millennial", xvar = npp_modis)
+
+
+ggpubr::ggarrange(mil1.1, mil2.1, mil3.1, mil4.1, mil5.1, mil6.1)
+ggsave(paste0("./model_output/Bias_forc_para_Millennial_",
+              Sys.Date(), ".jpeg"), width = 12, height = 8)
+
+# Interactive plot
+plotly::ggplotly(mil3.1)
+```
+
+#Plot bias vs spatial
+```{r}
+plot_fun_spatial <- function(xvar){
+  data_merged %>% 
+    ggplot(aes(y = C_bias_kg_m2, x = {{xvar}})) +
+    geom_point(aes(color = Country_Site)) +
+    scale_y_continuous("Pred - Obs SOC stocks ") +
+    geom_smooth(method = "lm") +
+    theme_bw(base_size = 14) +
+    theme(legend.position = "none") +
+    facet_wrap(~Type)
+}
+
+p1 <- plot_fun_spatial(xvar = Latitude)
+p2 <- plot_fun_spatial(xvar = Longitude)
+
+ggpubr::ggarrange(p1, p2, nrow = 2)
+ggsave(paste0("./model_output/Bias_spatial_MIMICS_Millennial_",
+              Sys.Date(), ".jpeg"), width = 12, height = 10)
+
+# data_merged %>% 
+#   ggplot(aes(x = Longitude, y = Am_Ox_Al)) +
+#   geom_point(aes(color = Site)) +
+#   geom_smooth(method = "lm") +
+#   theme_bw(base_size = 14) +
+#   theme(legend.position = "none")
+```
+
