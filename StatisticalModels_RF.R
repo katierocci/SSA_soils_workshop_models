@@ -37,9 +37,9 @@ afsis_mimics_rf <- afsis_data %>%
   mutate(npp_modis.gC.m2.yr = npp_modis*1000) %>% 
   dplyr::select(id, npp_modis.gC.m2.yr, Clay_2um, LIG_N, stemp, sm, C_stock)
 
-afsis_millennial_rf <- afsis_data %>% 
+afsis_millennial_rf <- afsis_data %>%
   unite("id", Country:Cluster) %>%
-  mutate(npp_modis.gC.m2.d = npp_modis*1000/365) %>% 
+  mutate(npp_modis.gC.m2.d = npp_modis*1000/365) %>%
   dplyr::select(id, npp_modis.gC.m2.d, Clay_63um, pH, stemp, sm, C_stock)
 
 ## MIMICS
@@ -115,5 +115,82 @@ mimics_effect_rf_pdp <- FeatureEffects$new(mimics_model_rf, method = "pdp",
                                                         "LIG_N", "stemp", "sm"))
 
 plot(mimics_effect_rf_pdp)
+ggsave(paste0("./model_output/RF_MIMICS_pdp_",
+              Sys.Date(), ".jpeg"), width = 10, height = 6)
 
+## Millennial
+millennial_task_rf <- as_task_regr(x = afsis_millennial_rf,
+                                   target = "C_stock")
+
+millennial_lrn_rf <- lrn("regr.ranger", importance = "permutation",
+                         num.trees = 1000)
+
+# Add id as group for CV (same id kept together)
+millennial_task_rf$set_col_roles("id", roles = "group")
+print(millennial_task_rf)
+
+# cross-validation
+set.seed(42)
+resampling_millennial <- rsmp("cv", folds = 10)
+resampling_millennial$instantiate(millennial_task_rf)
+
+## Train model & check performance
+millennial_rf <- mlr3::resample(task = millennial_task_rf, learner = millennial_lrn_rf, 
+                                resampling = resampling_millennial, store_models = TRUE)
+
+# R2 = 0.43, mae = 1.98, rmse = 2.89
+millennial_rf$aggregate(measures = msrs(c("regr.rsq", "regr.mae", "regr.rmse")))
+
+millennial_rf_pred <- millennial_rf$prediction(predict_sets = "test")
+millennial_rf_pred_df <- data.frame(truth = millennial_rf_pred$truth,
+                                    response = millennial_rf_pred$response)
+
+millennial_rf_pred_df %>% 
+  ggplot(aes(x = response, y = truth)) +
+  geom_point(size = 1) +
+  geom_rug(length = unit(0.25, "cm")) +
+  geom_abline(intercept = 0, slope = 1, color = "red") +
+  geom_smooth(method = "lm") +
+  theme_bw(base_size = 16) +
+  theme(axis.text = element_text(color = "black")) +
+  scale_y_continuous("Observed SOC stocks [kg/m2]", 
+                     limits = c(0,25), expand = c(0,0)) +
+  scale_x_continuous("Predicted SOC stocks [kg/m2]", 
+                     limits = c(0,25), expand = c(0,0))
+ggsave(paste0("./model_output/RF_Millennial_obs_pred_cv_10f_",
+              Sys.Date(), ".jpeg"), width = 6, height = 6)
+
+millennial_vi <- lapply(millennial_rf$learners, function(x) x$model$variable.importance)
+
+millennial_vi %>%
+  plyr::ldply() %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "x") %>%
+  summarise(median = median(x, na.rm = TRUE),
+            mad    = mad(x, na.rm = TRUE),
+            .by = variable) %>%
+  arrange(median)
+
+## Partial dependence plots
+millennial_task_rf_pdp <- as_task_regr(x = afsis_millennial_rf %>% 
+                                         dplyr::select(-id),
+                                       target = "C_stock")
+
+millennial_lrn_rf_pdp <- lrn("regr.ranger", importance = "permutation",
+                             num.trees = 1000) 
+
+set.seed(42)
+millennial_lrn_rf_pdp$train(millennial_task_rf_pdp)
+
+millennial_model_rf <- Predictor$new(millennial_lrn_rf_pdp, data = afsis_millennial_rf %>% 
+                                       dplyr::select(-id))
+
+#PDP
+millennial_effect_rf_pdp <- FeatureEffects$new(millennial_model_rf, method = "pdp",
+                                               features = c("npp_modis.gC.m2.d", 
+                                                            "Clay_63um",
+                                                            "pH", "stemp", "sm"))
+
+plot(millennial_effect_rf_pdp)
+ggsave(paste0("./model_output/RF_Millennial_pdp_",
+              Sys.Date(), ".jpeg"), width = 10, height = 6)
 
