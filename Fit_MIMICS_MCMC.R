@@ -84,6 +84,9 @@ MCMC_out <- data.frame(i=0,
                        slope=0,
                        r2=r2_train,
                        RMSE=RMSE_train,
+                       #testing
+                       #r2=0.02,
+                       #RMSE=100,
                        MICpropSOC=0,
                        LITpropSOC=0,
                        MIM_CO_Avg=0,
@@ -119,13 +122,18 @@ curr_p <- data.frame(Vslope_x = 1,
                      run_num=NA)
 
 # Set initial cost value (RMSE value to improve from)
-curr_cost <- (RMSE_train/max_RMSE) - r2_train
+#curr_cost <- (RMSE_train/max_RMSE) - r2_train
+curr_RMSE <- RMSE_train
+curr_r2 <- r2_train
+#testing
+#curr_RMSE <- 100
+#curr_r2 <- 0.02
 
 #Set trackers
 iters_wo_improve = 0
 
 #Set number of iterations for each parameter proposal 
-MIM_runs <- 200 #originally 200
+MIM_runs <- 100 #originally 200
 
 # Send progress statement to console
 print(paste0("Running ", as.character(MIM_runs), " MCMC iterations"))
@@ -175,25 +183,29 @@ for(i in 1:MIM_runs) {
                            improve=0)
     
     #Make decision based on cost outcome
-    if(((MIMout$RMSE/max_RMSE)-MIMout$r2) < curr_cost &&
-       MIMout$MICpropSOC > 0.01 &&
-       MIMout$MICpropSOC < 0.08 &&
+    if(MIMout$RMSE < curr_RMSE &&
+       MIMout$r2 > curr_r2 &&
+       #MIMout$RMSE/max_RMSE)-MIMout$r2) < curr_cost &&
+       MIMout$MICpropSOC > 0.008 &&
+       MIMout$MICpropSOC < 0.08 && #informed by Xu et al., 2013, https://doi.org/10.1111/geb.12029
        MIMout$LITpropSOC > 0.05 &&
        MIMout$LITpropSOC < 0.50 &&
        MIMout$MIM_CO_mn > 0.01 &&
        MIMout$MIM_CO_mn < 100 &&
        MIMout$SOMpTO > 50 &&
        MIMout$SOMpTO < 1000) 
-    {
+      {
       
       #Update targets
       curr_p <- test_p
-      curr_cost <- (MIMout$RMSE/max_RMSE)-MIMout$r2
+      #curr_cost <- (MIMout$RMSE/max_RMSE)-MIMout$r2
+      curr_RMSE = MIMout$RMSE
+      curr_r2 = MIMout$r2
       iter_out$improve <- 1
       iters_wo_improve <- 0
       
       # Print to console
-      print(paste0("IMPROVED COST TO ", round(curr_cost,4)))
+      print(paste0("IMPROVED RMSE and R2 TO ", round(curr_RMSE,4), " AND ", round(curr_r2,3)))
       
       ## Walk proposal distributions 
       # ONLY USEFUL IF COMPUTATIONAL POWER IS LIMITED, comment out if not
@@ -251,6 +263,7 @@ Sys.time() - start_time
 
 # Release CPU cores
 plan(sequential)
+
 nbrOfWorkers()
 
 
@@ -271,11 +284,12 @@ pKint_x <- ggplot(MCMC_out, aes(x=iter, y=Kint_x)) + geom_line(color="grey50", a
 
 walk_plot <- grid.arrange(pRMSE, pr2, pTau_x, pCUE_x, pDesorb_x, pFPHYS_x, pVslope_x, pVint_x, pKslope_x, ncol = 2)
 
+MCMC_out_check <- MCMC_out %>% filter(MIM_CO_Avg<100 & LITpropSOC<1 & RMSE<11) #only one paramter changing for best pset - seems messed up... and other issues with data - might try just r2 and see if that helps?
 
 MCMC_out_improved <- MCMC_out%>%filter(improve == 1) %>%mutate(cost = (RMSE/100)-r2)
 hist(MCMC_out_improved$RMSE)
 hist(MCMC_out_improved$r2)
-MCMC_SingleBest <- MCMC_out %>% filter(iter==351 & i==117)
+MCMC_SingleBest <- MCMC_out %>% filter(iter==24 & i==7)
 
 #save plot
 ggsave(file=paste0("MCMC/Output/", format(Sys.time(), "%Y%m%d_%H%M%S_"), "MIM_MCMC_pCombos-", as.character(MIM_runs),"_walk_plot", ".jpeg"), 
@@ -286,8 +300,25 @@ ggsave(file=paste0("MCMC/Output/", format(Sys.time(), "%Y%m%d_%H%M%S_"), "MIM_MC
 #######################
 # Export MCMC run data
 #######################
-write.csv(MCMC_out, "AfSIS_MCMC_Training_UpdatedInputs.csv")
+write.csv(MCMC_out_check, "AfSIS_MCMC_Training_BestRMSEr2combo.csv")
 write.csv(MCMC_SingleBest, "AfSIS_MCMC_Training_Best.csv")
+
+######################
+#import other good psets
+
+#updated inputs - current best
+MCMC_OldBest <- read.csv("AfSIS_MCMC_Training_UpdatedInputs.csv")
+MCMC_improved <- MCMC_OldBest %>% filter(improve == 1)
+MCMC_SingleBest <- MCMC_OldBest %>% filter(iter==351 & i==117)
+
+#prioritizing r2
+MCMC_r2 <- read.csv("AfSIS_MCMC_Training_SlightlyWorseRMSE.csv")
+MCMC_out_check_r2 <- MCMC_r2 %>% filter(MIM_CO_Avg<100 & LITpropSOC<1 & RMSE<11)
+MCMC_SingleBest <- MCMC_r2 %>% filter(iter==28 & i==9)
+write.csv(MCMC_SingleBest, "AfSIS_MIMICS_MCMC_Parameterized.csv")
+
+#original data
+#MCMC_SingleBest <- read.csv("AfSIS_MCMC_Training_Best.csv")
 
 
 ##################################

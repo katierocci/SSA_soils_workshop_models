@@ -101,6 +101,17 @@ forcing_data_Millennial <- forcing_data %>% mutate(npp_modis.gC.m2.d=npp_modis*1
 
 #Run MIMICS at AfSIS sites
 ```{r}
+#IF using parameterized MIMICS uncomment lines of code preceding model run
+MCMC_SingleBest <- read.csv('AfSIS_MIMICS_MCMC_Parameterized.csv')
+Tau_MULT <<- Tau_MULT*MCMC_SingleBest$Tau_x
+desorb_MULT <<- desorb_MULT*MCMC_SingleBest$desorb_x
+fPHYS_MULT <<- fPHYS_MULT*MCMC_SingleBest$fPHYS_x
+Vslope_MULT <<- Vslope_MULT*MCMC_SingleBest$Vslope_x
+Vint_MULT <<- Vint_MULT*MCMC_SingleBest$Vint_x
+Kslope_MULT <<- Kslope_MULT*MCMC_SingleBest$Kslope_x
+Kint_MULT <<- Kint_MULT*MCMC_SingleBest$Kint_x
+CUE_MULT <<- CUE_MULT*MCMC_SingleBest$CUE_x
+
 #run the model for all sites
 MIMruns <- forcing_data_MIMICS %>% split(1:nrow(forcing_data_MIMICS)) %>% map(~ MIMICS_SS(df=.))
 MIMICS_ss_AllSites <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
