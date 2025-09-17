@@ -1,0 +1,132 @@
+---
+title: "MIMICS sensitivity to inputs"
+author: "Katie Rocci - adapted from Rose Abramoff and Simon Heinberg"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+#Load libraries 
+```{r}
+library(readxl)
+library(tidyr)
+library(dplyr)
+library(corrplot)
+library(here)
+library(purrr)
+```
+
+#Read in SSA data and load MIMICS components
+```{r}
+#load mimics model components
+source(here("ODEs/RXEQ.R"))
+source(here("parameters/MIMICS_parameters_sandbox_20231129.R"))
+source(here("functions/calc_Tpars.R"))
+source(here("functions/MIMICS_calc_steady_state_pools.R"))
+
+##load forcing data
+forcing_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T)
+forcing_data<- forcing_data[,-1]
+colnames(forcing_data)[1] <- "Set"  # Fix for first column name import error
+
+#match MIMICS names
+forcing_data_MIMICS <- forcing_data %>% mutate(npp_modis.gC.m2.yr=npp_modis*1000) %>%
+    drop_na(npp_modis.gC.m2.yr, pH, Clay_2um, LIG_N, stemp, sm, Clay_63um, bd_extracted) %>%
+                                               select(Set, ANPP = npp_modis.gC.m2.yr, 
+                                               CLAY = Clay_2um,
+                                               lig_N = LIG_N,
+                                               TSOI = stemp,
+                                               theta_liq = sm,
+                                               Depth = Depth) %>%
+  filter(Depth=='Topsoil')
+
+```
+
+
+#load parameter changes (if needed)
+```{r}
+#IF using parameterized MIMICS uncomment lines of code preceding model run
+MCMC_SingleBest <- read.csv('AfSIS_MIMICS_MCMC_Parameterized.csv')
+Tau_MULT <<- Tau_MULT*MCMC_SingleBest$Tau_x
+desorb_MULT <<- desorb_MULT*MCMC_SingleBest$desorb_x
+fPHYS_MULT <<- fPHYS_MULT*MCMC_SingleBest$fPHYS_x
+Vslope_MULT <<- Vslope_MULT*MCMC_SingleBest$Vslope_x
+Vint_MULT <<- Vint_MULT*MCMC_SingleBest$Vint_x
+Kslope_MULT <<- Kslope_MULT*MCMC_SingleBest$Kslope_x
+Kint_MULT <<- Kint_MULT*MCMC_SingleBest$Kint_x
+CUE_MULT <<- CUE_MULT*MCMC_SingleBest$CUE_x
+```
+
+#load function to find min and maxes of columns
+```{r}
+find_min_max_df <- function(df, cols) {
+  # Check that all columns exist
+  missing <- setdiff(cols, names(df))
+  if (length(missing) > 0) {
+    stop(paste("Columns not found:", paste(missing, collapse = ", ")))
+  }
+  
+  # Compute min and max for each column
+  result <- data.frame(
+    column = cols,
+    min = sapply(cols, function(col) min(df[[col]], na.rm = TRUE)),
+    max = sapply(cols, function(col) max(df[[col]], na.rm = TRUE)),
+    row.names = NULL
+  )
+  
+  return(result)
+}
+```
+
+
+#Sensitivity analysis
+```
+In this sensitivity analysis, our overall objective is to understand how MIMICS output varies over the full ange of data available in the AfSIS dataset
+```
+##Define model inputs
+```
+Defines ranges of input values based on observed summary statistics for all data from AfSIS dataset
+```
+```{r}
+#Define ranges
+
+#find min and max of input columns
+inputs_max_min <- find_min_max_df(forcing_data_MIMICS, c("ANPP", "CLAY", "lig_N", "TSOI", "theta_liq"))
+
+#NPP (gC/m2/yr) 0s?
+NPP_seq = seq(inputs_max_min[inputs_max_min$column == "ANPP", "min"],inputs_max_min[inputs_max_min$column == "ANPP", "max"], length.out=10)
+#CLAY (percent)
+CLAY_seq = seq(inputs_max_min[inputs_max_min$column == "CLAY", "min"],inputs_max_min[inputs_max_min$column == "CLAY", "max"], length.out=10)
+#lig_N (unitless)
+ligN_seq = seq(inputs_max_min[inputs_max_min$column == "lig_N", "min"],inputs_max_min[inputs_max_min$column == "lig_N", "max"], length.out=10)
+#Soil Temperature (C)
+TSOI_seq = seq(inputs_max_min[inputs_max_min$column == "TSOI", "min"],inputs_max_min[inputs_max_min$column == "TSOI", "max"], length.out=10)
+#Soil moisture (volumetric soil moisture, fraction)
+theta_seq = seq(inputs_max_min[inputs_max_min$column == "theta_liq", "min"],inputs_max_min[inputs_max_min$column == "theta_liq", "max"], length.out=10)
+
+
+
+# Generate all combinations of the input values
+input_grid <- expand.grid(
+  ANPP = NPP_seq,
+  CLAY = CLAY_seq,
+  lig_N = ligN_seq,
+  TSOI = TSOI_seq,
+  theta_liq = theta_seq
+)
+
+# Randomly sample 1000 rows from the param_grid
+set.seed(123)  # for reproducibility
+sampled_grid <- input_grid[sample(nrow(input_grid), 1000), ]
+```
+
+##Run input data combinations for all models
+```{r}
+#subset of input grid
+#MIMruns <- sampled_grid %>% split(1:nrow(sampled_grid)) %>% map(~ MIMICS_SS(df=.))
+#full input grid
+MIMruns <- input_grid %>% split(1:nrow(input_grid)) %>% map(~ MIMICS_SS(df=.))
+MIMICS_ss_AllSites <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
+#export data for statistical analysis
+write.csv(MIMICS_ss_AllSites, 'MIMICS_SensitivityAnalysisOutput_091725.csv')
+```
+
