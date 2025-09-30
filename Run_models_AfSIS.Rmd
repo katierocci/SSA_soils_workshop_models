@@ -194,6 +194,8 @@ hist(Millennial_ss_AllSites$Soil_Organic_Carbon_kg_m2)
 both_models <- full_join(MIMICS_ss_AllSites %>% select(Set = SET, Soil_Organic_Carbon_kg_m2, Type), Millennial_ss_AllSites %>% select(Set, Soil_Organic_Carbon_kg_m2, Type)) %>% full_join(forcing_data %>% mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100, Type="Observed"))
 
 ggplot(both_models, aes(x=Soil_Organic_Carbon_kg_m2)) + geom_histogram(bins = 30, fill = "steelblue", color = "white") + facet_wrap(~ Type, ncol = 1)
+
+write.csv(both_models, "./model_output/both_model_results_default_run.csv")
 ```
 
 #combine model output and afsis data
