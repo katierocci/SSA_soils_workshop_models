@@ -16,7 +16,6 @@ library(tidyr)
 
 ##load forcing data
 forcing_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T)
-forcing_data <- forcing_data[,-c(1,2,4)] # Fix for first column name import error
 
 forcing_data_Millennial <- forcing_data %>% 
                                    drop_na(Litterfall.gC.m2.yr, NPP.gC.m2.d, Clay_2um, Clay_63um, SoilTMP_C, SoilMoi_m3m3, pH, bd_extracted, LIG_N) %>%

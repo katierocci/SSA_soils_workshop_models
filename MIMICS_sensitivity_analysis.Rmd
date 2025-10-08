@@ -23,10 +23,13 @@ source(here("parameters/MIMICS_parameters_sandbox_20231129.R"))
 source(here("functions/calc_Tpars.R"))
 source(here("functions/MIMICS_calc_steady_state_pools.R"))
 
-##load forcing data
-forcing_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T)
-forcing_data<- forcing_data[,-1]
-colnames(forcing_data)[1] <- "Set"  # Fix for first column name import error
+## AfSIS data
+afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is = T)
+
+## Prepare forcing data
+forcing_data <- afsis_data %>% 
+  tibble::rowid_to_column("Set") %>% 
+  filter(Depth == 'Topsoil')
 
 #match MIMICS names
 forcing_data_MIMICS <- forcing_data %>% mutate(npp_modis.gC.m2.yr=npp_modis*1000) %>%
@@ -36,8 +39,7 @@ forcing_data_MIMICS <- forcing_data %>% mutate(npp_modis.gC.m2.yr=npp_modis*1000
                                                lig_N = LIG_N,
                                                TSOI = stemp,
                                                theta_liq = sm,
-                                               Depth = Depth) %>%
-  filter(Depth=='Topsoil')
+                                               Depth = Depth)
 
 ```
 
