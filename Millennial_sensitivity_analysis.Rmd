@@ -21,10 +21,13 @@ library(purrr)
 source(here("functions/run_functions.R")) #R script that contains calls to run model
 source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
 
-##load forcing data
-forcing_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T)
-forcing_data<- forcing_data[,-1]
-colnames(forcing_data)[1] <- "Set"  # Fix for first column name import error
+## AfSIS data
+afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is = T)
+
+## Prepare forcing data
+forcing_data <- afsis_data %>% 
+  tibble::rowid_to_column("Set") %>% 
+  filter(Depth == 'Topsoil')
 
 #match Millennial names
 forcing_data_Millennial <- forcing_data %>% mutate(npp_modis.gC.m2.d=npp_modis*1000/365) %>%
@@ -40,8 +43,7 @@ forcing_data_Millennial <- forcing_data %>% mutate(npp_modis.gC.m2.d=npp_modis*1
                                    SSN = SSN,
                                    Depth = Depth) %>% 
                             mutate(param_bulkd = param_bulkd*1000*0.2, param_pc = 0.86, #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
-                                   site_id = row_number()) %>% 
-                                  filter(Depth == "Topsoil")
+                                   site_id = row_number())
 ```
 
 
