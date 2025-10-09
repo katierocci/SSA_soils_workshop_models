@@ -131,16 +131,16 @@ pred_random_spatial_points_df <- random_spatial_points_NA_df %>%
 # Apply constraints based on observed ranges
 pred_point_constr <- pred_random_spatial_points_df %>%
   mutate(
-    Clay_2um = pmax(min(afsis_model_data$Clay_2um, na.rm=TRUE), 
-                    pmin(Clay_2um, max(afsis_model_data$Clay_2um, na.rm=TRUE))),
-    Clay_63um = pmax(min(afsis_model_data$Clay_63um, na.rm=TRUE), 
-                     pmin(Clay_63um, max(afsis_model_data$Clay_63um, na.rm=TRUE))),
+    Clay_2um = pmax(min(afsis_model_data$Clay_2um), 
+                    pmin(Clay_2um, max(afsis_model_data$Clay_2um))),
+    Clay_63um = pmax(min(afsis_model_data$Clay_63um), 
+                     pmin(Clay_63um, max(afsis_model_data$Clay_63um))),
     # Ensure Clay_2um <= Clay_63um
     Clay_2um = pmin(Clay_2um, Clay_63um),
-    pH = pmax(min(afsis_model_data$pH, na.rm=TRUE), 
-              pmin(pH, max(afsis_model_data$pH, na.rm=TRUE))),
-    LIG_N = pmax(min(afsis_model_data$LIG_N, na.rm=TRUE), 
-                 pmin(LIG_N, max(afsis_model_data$LIG_N, na.rm=TRUE)))
+    pH = pmax(min(afsis_model_data$pH), 
+              pmin(pH, max(afsis_model_data$pH))),
+    LIG_N = pmax(min(afsis_model_data$LIG_N), 
+                 pmin(LIG_N, max(afsis_model_data$LIG_N)))
   )
 
 summary(pred_point_constr)
@@ -157,7 +157,7 @@ for(var in c("Clay_2um", "Clay_63um", "pH", "LIG_N", "sm", "stemp", "npp_modis",
 
 # Check correlations are maintained
 cor(afsis_model_data[, c("Clay_2um", "sm", "stemp", "npp_modis")])
-cor(pred_point_constr[, c("Clay_2um", "sm", "stemp", "npp_modis")], use = "complete.obs")
+cor(pred_point_constr[, c("Clay_2um", "sm", "stemp", "npp_modis")])
 
 write.csv(pred_point_constr, row.names = FALSE,
           paste0("./forcing_data/sensitivity_analysis_simulated_input_data_",
