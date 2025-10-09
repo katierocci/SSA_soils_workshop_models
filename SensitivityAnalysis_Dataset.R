@@ -88,7 +88,7 @@ random_spatial_points_df <- random_points_df %>%
 # Check for NAs (points that fall outside raster extents)
 summary(random_spatial_points_df)
 
-# Remove rows with any NAs
+# Remove rows with any NAs and reduce to 100,000 samples
 random_spatial_points_NA_df <- random_spatial_points_df %>%
   filter(complete.cases(.)) %>% 
   # Convert bulk density from 10×kg/m³ to g/cm³
@@ -128,7 +128,7 @@ pred_random_spatial_points_df <- random_spatial_points_NA_df %>%
     LIG_N = predict(model_LIG_N, .) + rnorm(n(), 0, sigma(model_LIG_N))
   )
 
-# Apply constraints based on OBSERVED ranges (not arbitrary bounds)
+# Apply constraints based on observed ranges
 pred_point_constr <- pred_random_spatial_points_df %>%
   mutate(
     Clay_2um = pmax(min(afsis_model_data$Clay_2um, na.rm=TRUE), 
@@ -158,5 +158,9 @@ for(var in c("Clay_2um", "Clay_63um", "pH", "LIG_N", "sm", "stemp", "npp_modis",
 # Check correlations are maintained
 cor(afsis_model_data[, c("Clay_2um", "sm", "stemp", "npp_modis")])
 cor(pred_point_constr[, c("Clay_2um", "sm", "stemp", "npp_modis")], use = "complete.obs")
+
+write.csv(pred_point_constr, row.names = FALSE,
+          paste0("./forcing_data/sensitivity_analysis_simulated_input_data_",
+                 Sys.Date(), ".csv"))
 
 
