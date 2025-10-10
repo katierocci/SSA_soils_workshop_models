@@ -27,15 +27,17 @@ forcing_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T)
 
 #match MIMICS names
 forcing_data_MIMICS <- forcing_data %>% 
-  drop_na(Litterfall.gC.m2.yr, pH, Clay_2um, LIG_N, SoilTMP_C, SoilMoi_m3m3, NPP.gC.m2.d, Clay_63um, bd_extracted)  %>% 
+  mutate(npp_modis.gC.m2.yr=npp_modis*1000) %>%
   filter(CORG <=20) %>%
   mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100) %>%
-  select(X, ANPP = Litterfall.gC.m2.yr, 
-         CLAY = Clay_2um,
-         lig_N = LIG_N,
-         TSOI = SoilTMP_C,
-         theta_liq = SoilMoi_m3m3,
-         Depth = Depth, Soil_Organic_Carbon_kg_m2) %>%
+  drop_na(npp_modis.gC.m2.yr, pH, Clay_2um, LIG_N, stemp, sm, Clay_63um, bd_extracted) %>%
+                                               select(X, ANPP = npp_modis.gC.m2.yr, 
+                                               CLAY = Clay_2um,
+                                               lig_N = LIG_N,
+                                               TSOI = stemp,
+                                               theta_liq = sm,
+                                               Depth = Depth,
+                                               Soil_Organic_Carbon_kg_m2) %>%
   filter(Depth=='Topsoil')
 
 #load mimics model components

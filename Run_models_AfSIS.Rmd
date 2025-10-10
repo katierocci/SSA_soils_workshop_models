@@ -245,15 +245,15 @@ lm_mimics <- lm(C_stock_obs_kg_m2 ~ C_stock_pred_kg_m2,
                 data = data_merged %>% filter(Type == "MIMICS"))
 
 summary(lm_mimics)
-data_MIMICS = data_merged %>% filter(Type == "MIMICS")
-RMSE_MIMICS = sqrt(mean((data_MIMICS$C_stock_obs_kg_m2 - data_MIMICS$C_stock_pred_kg_m2)^2))
+data_MIMICS = data_merged %>% filter(Type == "MIMICS") %>% filter(!is.na(C_stock_obs_kg_m2)) %>% filter(!is.na(C_stock_pred_kg_m2)) 
+RMSE_MIMICS = sqrt(mean((data_MIMICS$C_stock_obs_kg_m2 - data_MIMICS$C_stock_pred_kg_m2)^2)) #default=9.94; fitted=4.62
 
 
 lm_millennial <- lm(C_stock_obs_kg_m2 ~ C_stock_pred_kg_m2, 
                     data = data_merged %>% filter(Type == "Millennial"))
 
 summary(lm_millennial)
-data_Mill = data_merged %>% filter(Type == "Millennial")
+data_Mill = data_merged %>% filter(Type == "Millennial") %>% filter(!is.na(C_stock_obs_kg_m2)) %>% filter(!is.na(C_stock_pred_kg_m2)) 
 RMSE_Mill = sqrt(mean((data_Mill$C_stock_obs_kg_m2 - data_Mill$C_stock_pred_kg_m2)^2))
 ```
 
