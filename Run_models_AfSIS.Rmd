@@ -148,7 +148,7 @@ ggplot(MIMICS_ss_AllSites) +
 ```{r}
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
 parameters.file <- read.table(here("parameters/soilpara_in_fit.txt")) #default
-# parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA.txt")) #fitted
+#parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA.txt")) #fitted
 parameters <- as.list(parameters.file$V2)
 names(parameters) <- parameters.file$V1
 
@@ -229,8 +229,6 @@ ggplot(both_models, aes(x = Soil_Organic_Carbon_kg_m2)) +
   geom_histogram(bins = 30, fill = "steelblue", color = "white") + 
   facet_wrap(~ Type, ncol = 1)
 
-<<<<<<< HEAD
-ggplot(both_models, aes(x=Soil_Organic_Carbon_kg_m2)) + geom_histogram(bins = 30, fill = "steelblue", color = "white") + facet_wrap(~ Type, ncol = 1)
 ```
 
 #combine model output and afsis data
@@ -241,7 +239,7 @@ model_out <- both_models %>%
   dplyr::rename(C_stock_pred_kg_m2 = Soil_Organic_Carbon_kg_m2) %>% filter(Type != "Observed") %>%
   select(Type, Set, C_stock_pred_kg_m2) %>% inner_join(Set.SSN, by="Set")
 
-afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T, , row.names = 1) %>% 
+afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is=T) %>% 
   dplyr::select(SSN, Site, Cluster, Plot, Country, Longitude, Latitude,
                 Clay_2um, Clay_8um, Clay_63um, LIG_N, stemp, sm,
                 Depth, CORG, pH, bd_extracted, npp_modis,
@@ -272,8 +270,8 @@ pred_obs <- data_merged %>%
   theme(legend.position = "none") +
   facet_wrap(~Type, scales = "free_x")
 pred_obs
-ggsave(paste0("./model_output/Pred_Obs_BothModels_",
-              Sys.Date(), ".jpeg"), width = 12, height = 6)
+#ggsave(paste0("./model_output/Pred_Obs_BothModels_",
+#              Sys.Date(), ".jpeg"), width = 12, height = 6)
 
 # Interactive plot
 # plotly::ggplotly(pred_obs)
@@ -284,6 +282,7 @@ lm_mimics <- lm(C_stock_obs_kg_m2 ~ C_stock_pred_kg_m2,
 summary(lm_mimics)
 data_MIMICS = data_merged %>% filter(Type == "MIMICS") %>% filter(!is.na(C_stock_obs_kg_m2)) %>% filter(!is.na(C_stock_pred_kg_m2)) 
 RMSE_MIMICS = sqrt(mean((data_MIMICS$C_stock_obs_kg_m2 - data_MIMICS$C_stock_pred_kg_m2)^2)) #default=9.94; fitted=4.62
+rmse_resid_MIMICS <- sqrt(mean(lm_mimics$residuals^2)) #default=3.68; fitted=3.74
 
 
 lm_millennial <- lm(C_stock_obs_kg_m2 ~ C_stock_pred_kg_m2, 
@@ -291,7 +290,8 @@ lm_millennial <- lm(C_stock_obs_kg_m2 ~ C_stock_pred_kg_m2,
 
 summary(lm_millennial)
 data_Mill = data_merged %>% filter(Type == "Millennial") %>% filter(!is.na(C_stock_obs_kg_m2)) %>% filter(!is.na(C_stock_pred_kg_m2)) 
-RMSE_Mill = sqrt(mean((data_Mill$C_stock_obs_kg_m2 - data_Mill$C_stock_pred_kg_m2)^2))
+RMSE_Mill = sqrt(mean((data_Mill$C_stock_obs_kg_m2 - data_Mill$C_stock_pred_kg_m2)^2)) #default = 7.50; fitted = 4.08
+rmse_resid_Mill <- sqrt(mean(lm_millennial$residuals^2)) #default=3.85; fitted=3.55
 ```
 
 #Plot model bias against selected soil properties
@@ -426,7 +426,5 @@ ggsave(paste0("./model_output/Bias_spatial_MIMICS_Millennial_",
 #   geom_smooth(method = "lm") +
 #   theme_bw(base_size = 14) +
 #   theme(legend.position = "none")
-=======
->>>>>>> 1616dd32a14e98976274017c0f892be326ac6f4c
 ```
 
