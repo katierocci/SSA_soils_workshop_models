@@ -288,7 +288,7 @@ ggsave(paste0("./model_output/BiasPlots_MIMICS_Millennial_Fitted_soil_",
 
 # Spatial plotting
 s9 <- bias_plot_fun_forc_prop(Longitude, "Longitude")
-s10 <- bias_plot_fun_forc_prop(Longitude, "Longitude")
+s10 <- bias_plot_fun_forc_prop(Latitude, "Latitude")
 
 annotate_figure(  
   ggarrange(s9, s10, common.legend = TRUE),  
