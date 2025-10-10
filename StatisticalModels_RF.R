@@ -31,7 +31,7 @@ afsis_data$Plot <- as.character(afsis_data$Plot)
 
 afsis_data$Cluster <- as.character(afsis_data$Cluster)
 
-# Select variables (based on model forcing patameters)
+# Select variables (based on model forcing parameters)
 afsis_mimics_rf <- afsis_data %>% 
   unite("id", Country:Cluster) %>%
   mutate(npp_modis.gC.m2.yr = npp_modis*1000) %>% 
@@ -86,13 +86,29 @@ ggsave(paste0("./model_output/RF_MIMICS_obs_pred_cv_10f_",
 
 mimics_vi <- lapply(mimics_rf$learners, function(x) x$model$variable.importance)
 
-mimics_vi %>%
+mimics_vi_df <- mimics_vi %>%
   plyr::ldply() %>%
   pivot_longer(everything(), names_to = "variable", values_to = "x") %>%
   summarise(median = median(x, na.rm = TRUE),
             mad    = mad(x, na.rm = TRUE),
             .by = variable) %>%
-  arrange(median)
+  arrange(median) %>% 
+  mutate(median_pct = (median / sum(median, na.rm = TRUE)) * 100,
+         mad_pct = (mad / sum(median, na.rm = TRUE)) * 100) 
+
+mimics_vi_df %>% 
+  ggplot(aes(x = reorder(variable, -median_pct), y = median_pct)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = median_pct - mad_pct,
+                    ymax = median_pct + mad_pct),
+                width = 0.15) +
+  theme_bw(base_size = 16) +
+  theme(axis.text = element_text(color = "black")) +
+  scale_x_discrete("") +
+  scale_y_continuous("Relative explained variation (%)", expand = c(0,0),
+                     limits = c(0,35))
+ggsave(paste0("./model_output/RF_MIMICS_vi_cv_10f_",
+              Sys.Date(), ".jpeg"), width = 8, height = 6)
 
 ## Partial dependence plots
 mimics_task_rf_pdp <- as_task_regr(x = afsis_mimics_rf %>% 
@@ -118,6 +134,14 @@ plot(mimics_effect_rf_pdp)
 ggsave(paste0("./model_output/RF_MIMICS_pdp_",
               Sys.Date(), ".jpeg"), width = 10, height = 6)
 
+#PDP - 2D
+mimics_effect_rf_pdp_2d <- FeatureEffect$new(mimics_model_rf, method = "pdp",
+                                             feature = c("stemp", "sm"))
+
+plot(mimics_effect_rf_pdp_2d)
+ggsave(paste0("./model_output/RF_MIMICS_pdp_2d_sm_stemp",
+              Sys.Date(), ".jpeg"), width = 10, height = 6)
+
 ## Millennial
 millennial_task_rf <- as_task_regr(x = afsis_millennial_rf,
                                    target = "C_stock")
@@ -138,7 +162,7 @@ resampling_millennial$instantiate(millennial_task_rf)
 millennial_rf <- mlr3::resample(task = millennial_task_rf, learner = millennial_lrn_rf, 
                                 resampling = resampling_millennial, store_models = TRUE)
 
-# R2 = 0.43, mae = 1.98, rmse = 2.89
+# R2 = 0.47, mae = 1.87, rmse = 2.78
 millennial_rf$aggregate(measures = msrs(c("regr.rsq", "regr.mae", "regr.rmse")))
 
 millennial_rf_pred <- millennial_rf$prediction(predict_sets = "test")
@@ -162,13 +186,29 @@ ggsave(paste0("./model_output/RF_Millennial_obs_pred_cv_10f_",
 
 millennial_vi <- lapply(millennial_rf$learners, function(x) x$model$variable.importance)
 
-millennial_vi %>%
+millennial_vi_df <- millennial_vi %>%
   plyr::ldply() %>%
   pivot_longer(everything(), names_to = "variable", values_to = "x") %>%
   summarise(median = median(x, na.rm = TRUE),
             mad    = mad(x, na.rm = TRUE),
             .by = variable) %>%
-  arrange(median)
+  arrange(median) %>% 
+  mutate(median_pct = (median / sum(median, na.rm = TRUE)) * 100,
+         mad_pct = (mad / sum(median, na.rm = TRUE)) * 100) 
+
+millennial_vi_df %>% 
+  ggplot(aes(x = reorder(variable, -median_pct), y = median_pct)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = median_pct - mad_pct,
+                    ymax = median_pct + mad_pct),
+                width = 0.15) +
+  theme_bw(base_size = 16) +
+  theme(axis.text = element_text(color = "black")) +
+  scale_x_discrete("") +
+  scale_y_continuous("Relative explained variation (%)", expand = c(0,0),
+                     limits = c(0,35))
+ggsave(paste0("./model_output/RF_Millennial_vi_cv_10f_",
+              Sys.Date(), ".jpeg"), width = 8, height = 6)
 
 ## Partial dependence plots
 millennial_task_rf_pdp <- as_task_regr(x = afsis_millennial_rf %>% 
@@ -194,3 +234,291 @@ plot(millennial_effect_rf_pdp)
 ggsave(paste0("./model_output/RF_Millennial_pdp_",
               Sys.Date(), ".jpeg"), width = 10, height = 6)
 
+#PDP - 2D
+millennial_effect_rf_pdp_2d <- FeatureEffect$new(millennial_model_rf, method = "pdp",
+                                                 feature = c("stemp", "sm"))
+
+plot(millennial_effect_rf_pdp_2d)
+ggsave(paste0("./model_output/RF_Millennial_pdp_2d_sm_stemp",
+              Sys.Date(), ".jpeg"), width = 10, height = 6)
+
+####################### Sensitivity Model runs #####################
+
+## MIMICS ##
+mimics_sens <- read.csv("./MIMICS_SensitivityAnalysisOutput_091725.csv", as.is = T)
+head(mimics_sens)
+
+# Check data range
+p1 <- mimics_sens %>% 
+  ggplot(aes(x = ANPP, y = Soil_Organic_Carbon_kg_m2)) +
+  geom_point() +
+  geom_rug()
+p2 <- mimics_sens %>% 
+  ggplot(aes(x = CLAY, y = Soil_Organic_Carbon_kg_m2)) +
+  geom_point() +
+  geom_rug()
+p3 <- mimics_sens %>% 
+  ggplot(aes(x = LIG_N, y = Soil_Organic_Carbon_kg_m2)) +
+  geom_point() +
+  geom_rug()
+p4 <- mimics_sens %>% 
+  ggplot(aes(x = TSOI, y = Soil_Organic_Carbon_kg_m2)) +
+  geom_point() +
+  geom_rug()
+p5 <- mimics_sens %>% 
+  ggplot(aes(x = THETA_LIQ, y = Soil_Organic_Carbon_kg_m2)) +
+  geom_point() +
+  geom_rug()
+ggarrange(p1, p2, p3, p4, p5)
+ggsave(paste0("./model_output/MIMICS_sens_data_range_",
+              Sys.Date(), ".jpeg"), width = 10, height = 6)
+
+mimics_sens_df_rf <- mimics_sens %>% 
+  #select input variables: SOC stocks, NPP, clay 2um, lignin N, stemp, sm
+  dplyr::select(Soil_Organic_Carbon_kg_m2, ANPP, CLAY, LIG_N, TSOI, THETA_LIQ)
+
+summary(mimics_sens_df_rf)
+
+mimics_sens_task_rf <- as_task_regr(x = mimics_sens_df_rf,
+                               target = "Soil_Organic_Carbon_kg_m2")
+
+mimics_sens_lrn_rf <- lrn("regr.ranger", importance = "permutation",
+                          num.trees = 1000)
+
+# Add id as group for CV (same id kept together)
+# mimics_task_rf$set_col_roles("id", roles = "group")
+# print(mimics_task_rf)
+
+# cross-validation
+set.seed(42)
+resampling <- rsmp("cv", folds = 10)
+resampling$instantiate(mimics_sens_task_rf)
+
+## Train model & check performance
+mimics_sens_rf <- mlr3::resample(task = mimics_sens_task_rf, learner = mimics_sens_lrn_rf, 
+                                 resampling = resampling, store_models = TRUE)
+
+# R2 = 0.99, mae = 0.23, rmse = 0.45
+mimics_sens_rf$aggregate(measures = msrs(c("regr.rsq", "regr.mae", "regr.rmse")))
+
+mimics_sens_rf_pred <- mimics_sens_rf$prediction(predict_sets = "test")
+mimics_sens_rf_pred_df <- data.frame(truth = mimics_sens_rf_pred$truth,
+                                     response = mimics_sens_rf_pred$response)
+
+mimics_sens_rf_pred_df %>% 
+  ggplot(aes(x = response, y = truth)) +
+  geom_point(size = 1) +
+  geom_rug(length = unit(0.25, "cm")) +
+  geom_abline(intercept = 0, slope = 1, color = "red") +
+  geom_smooth(method = "lm") +
+  theme_bw(base_size = 16) +
+  theme(axis.text = element_text(color = "black")) +
+  scale_y_continuous("Observed SOC stocks [kg/m2]", 
+                     limits = c(0,86), expand = c(0,0)) +
+  scale_x_continuous("Predicted SOC stocks [kg/m2]", 
+                     limits = c(0,86), expand = c(0,0))
+ggsave(paste0("./model_output/RF_MIMICS_sens_obs_pred_cv_10f_",
+              Sys.Date(), ".jpeg"), width = 6, height = 6)
+
+mimics_sens_vi <- lapply(mimics_sens_rf$learners, function(x) x$model$variable.importance)
+
+mimics_sens_vi_df <- mimics_sens_vi %>%
+  plyr::ldply() %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "x") %>%
+  summarise(median = median(x, na.rm = TRUE),
+            mad    = mad(x, na.rm = TRUE),
+            .by = variable) %>%
+  arrange(median) %>% 
+  mutate(median_pct = (abs(median) / sum(abs(median), na.rm = TRUE)) * 100,
+         mad_pct = (mad / sum(abs(median), na.rm = TRUE)) * 100) 
+
+mimics_sens_vi_df %>% 
+  ggplot(aes(x = reorder(variable, -median_pct), y = median_pct)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = median_pct - mad_pct,
+                    ymax = median_pct + mad_pct),
+                width = 0.15) +
+  theme_bw(base_size = 16) +
+  theme(axis.text = element_text(color = "black")) +
+  scale_x_discrete("") +
+  scale_y_continuous("Relative explained variation (%)", expand = c(0,0),
+                     limits = c(0,66))
+ggsave(paste0("./model_output/RF_MIMICS_sens_vi_cv_10f_",
+              Sys.Date(), ".jpeg"), width = 8, height = 6)
+
+## Partial dependence plots
+mimics_sens_task_rf_pdp <- as_task_regr(x = mimics_sens_df_rf,
+                                        target = "Soil_Organic_Carbon_kg_m2")
+
+mimics_sens_lrn_rf_pdp <- lrn("regr.ranger", importance = "permutation",
+                              num.trees = 1000) 
+
+set.seed(42)
+mimics_sens_lrn_rf_pdp$train(mimics_sens_task_rf_pdp)
+mimics_sens_model_rf <- Predictor$new(mimics_sens_lrn_rf_pdp, data = mimics_sens_df_rf)
+
+# Increase the maximum allowed size for parallel processing
+options(future.globals.maxSize = 2000 * 1024^2)  # 2 GB
+
+# Create a smaller dataset for PDP calculation
+set.seed(42)
+n_sample <- min(1000, nrow(mimics_sens_df_rf))  # Use max 1000 rows
+sample_idx <- sample(nrow(mimics_sens_df_rf), n_sample)
+mimics_sens_df_rf_small <- mimics_sens_df_rf[sample_idx, ]
+
+# Create new predictor with smaller dataset
+mimics_sens_model_rf_small <- Predictor$new(mimics_sens_lrn_rf_pdp, data = mimics_sens_df_rf_small)
+
+# Calculate PDP
+mimics_sens_effect_rf_pdp <- FeatureEffects$new(mimics_sens_model_rf_small, method = "pdp",
+                                                features = c("ANPP", "CLAY", "LIG_N",
+                                                             "TSOI", "THETA_LIQ"))
+plot(mimics_sens_effect_rf_pdp)
+ggsave(paste0("./model_output/RF_MIMICS_sens_pdp_",
+              Sys.Date(), ".jpeg"), width = 10, height = 6)
+
+## Millennial ##
+millennial_sens <- read.csv("./Millennial_SensitivityAnalysisOutput_091725.csv", as.is = T)
+head(millennial_sens)
+
+# Create a smaller dataset for faster computing
+set.seed(42)
+n_sample <- min(100000, nrow(millennial_sens))  # Use max 100000 rows
+sample_idx <- sample(nrow(millennial_sens), n_sample)
+millennial_sens_small <- millennial_sens[sample_idx, ]
+
+# Check data range
+p1 <- millennial_sens_small %>% 
+  ggplot(aes(x = forc_npp, y = Soil_Organic_Carbon_kg_m2)) +
+  geom_point() +
+  geom_rug()
+p2 <- millennial_sens_small %>% 
+  ggplot(aes(x = param_claysilt, y = Soil_Organic_Carbon_kg_m2)) +
+  geom_point() +
+  geom_rug()
+p3 <- millennial_sens_small %>% 
+  ggplot(aes(x = param_pH, y = Soil_Organic_Carbon_kg_m2)) +
+  geom_point() +
+  geom_rug()
+p4 <- millennial_sens_small %>% 
+  ggplot(aes(x = forc_st, y = Soil_Organic_Carbon_kg_m2)) +
+  geom_point() +
+  geom_rug()
+p5 <- millennial_sens_small %>% 
+  ggplot(aes(x = forc_sw, y = Soil_Organic_Carbon_kg_m2)) +
+  geom_point() +
+  geom_rug()
+ggarrange(p1, p2, p3, p4, p5)
+ggsave(paste0("./model_output/Millennial_sens_data_range_",
+              Sys.Date(), ".jpeg"), width = 10, height = 6)
+
+millennial_sens_df_rf <- millennial_sens_small %>% 
+  #select input variables: SOC stocks, NPP, clay 2um, lignin N, stemp, sm
+  dplyr::select(Soil_Organic_Carbon_kg_m2, forc_npp, param_claysilt, param_pH, 
+                forc_st, forc_sw)
+
+summary(millennial_sens_df_rf)
+
+millennial_sens_task_rf <- as_task_regr(x = millennial_sens_df_rf,
+                                        target = "Soil_Organic_Carbon_kg_m2")
+
+millennial_sens_lrn_rf <- lrn("regr.ranger", importance = "permutation",
+                              num.trees = 1000)
+
+# Add id as group for CV (same id kept together)
+# millennial_task_rf$set_col_roles("id", roles = "group")
+# print(millennial_task_rf)
+
+# cross-validation
+set.seed(42)
+resampling <- rsmp("cv", folds = 10)
+resampling$instantiate(millennial_sens_task_rf)
+
+## Train model & check performance
+millennial_sens_rf <- mlr3::resample(task = millennial_sens_task_rf, 
+                                     learner = millennial_sens_lrn_rf, 
+                                     resampling = resampling, store_models = TRUE)
+
+# R2 = 0.98, mae = 0.40, rmse = 0.55
+millennial_sens_rf$aggregate(measures = msrs(c("regr.rsq", "regr.mae", "regr.rmse")))
+
+millennial_sens_rf_pred <- millennial_sens_rf$prediction(predict_sets = "test")
+millennial_sens_rf_pred_df <- data.frame(truth = millennial_sens_rf_pred$truth,
+                                         response = millennial_sens_rf_pred$response)
+
+millennial_sens_rf_pred_df %>% 
+  ggplot(aes(x = response, y = truth)) +
+  geom_point(size = 1) +
+  geom_rug(length = unit(0.25, "cm")) +
+  geom_abline(intercept = 0, slope = 1, color = "red") +
+  geom_smooth(method = "lm") +
+  theme_bw(base_size = 16) +
+  theme(axis.text = element_text(color = "black")) +
+  scale_y_continuous("Observed SOC stocks [kg/m2]", 
+                     limits = c(0,25), expand = c(0,0)) +
+  scale_x_continuous("Predicted SOC stocks [kg/m2]", 
+                     limits = c(0,25), expand = c(0,0))
+ggsave(paste0("./model_output/RF_Millennial_sens_obs_pred_cv_10f_",
+              Sys.Date(), ".jpeg"), width = 6, height = 6)
+
+millennial_sens_vi <- lapply(millennial_sens_rf$learners, function(x) x$model$variable.importance)
+
+millennial_sens_vi_df <- millennial_sens_vi %>%
+  plyr::ldply() %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "x") %>%
+  summarise(median = median(x, na.rm = TRUE),
+            mad    = mad(x, na.rm = TRUE),
+            .by = variable) %>%
+  arrange(median) %>% 
+  mutate(median_pct = (abs(median) / sum(abs(median), na.rm = TRUE)) * 100,
+         mad_pct = (mad / sum(abs(median), na.rm = TRUE)) * 100) 
+
+millennial_sens_vi_df %>% 
+  ggplot(aes(x = reorder(variable, -median_pct), y = median_pct)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = median_pct - mad_pct,
+                    ymax = median_pct + mad_pct),
+                width = 0.15) +
+  theme_bw(base_size = 16) +
+  theme(axis.text = element_text(color = "black")) +
+  scale_x_discrete("") +
+  scale_y_continuous("Relative explained variation (%)", expand = c(0,0),
+                     limits = c(0,55))
+ggsave(paste0("./model_output/RF_Millennial_sens_vi_cv_10f_",
+              Sys.Date(), ".jpeg"), width = 8, height = 6)
+
+## Partial dependence plots
+millennial_sens_task_rf_pdp <- as_task_regr(x = millennial_sens_df_rf,
+                                            target = "Soil_Organic_Carbon_kg_m2")
+
+millennial_sens_lrn_rf_pdp <- lrn("regr.ranger", importance = "permutation",
+                                  num.trees = 1000) 
+
+set.seed(42)
+millennial_sens_lrn_rf_pdp$train(millennial_sens_task_rf_pdp)
+
+millennial_sens_model_rf <- Predictor$new(millennial_sens_lrn_rf_pdp, 
+                                          data = millennial_sens_df_rf)
+
+# Increase the maximum allowed size for parallel processing
+options(future.globals.maxSize = 2000 * 1024^2)  # 2 GB
+
+# Create a smaller dataset for PDP calculation
+set.seed(42)
+n_sample <- min(1000, nrow(millennial_sens_df_rf))  # Use max 1000 rows
+sample_idx <- sample(nrow(millennial_sens_df_rf), n_sample)
+millennial_sens_df_rf_small <- millennial_sens_df_rf[sample_idx, ]
+
+# Create new predictor with smaller dataset
+millennial_sens_model_rf_small <- Predictor$new(millennial_sens_lrn_rf_pdp, 
+                                                data = millennial_sens_df_rf_small)
+
+# Calculate PDP
+millennial_sens_effect_rf_pdp <- FeatureEffects$new(millennial_sens_model_rf_small, 
+                                                    method = "pdp",
+                                                    features = c("forc_npp", "param_claysilt", 
+                                                                 "param_pH",
+                                                                 "forc_st", "forc_sw"))
+plot(millennial_sens_effect_rf_pdp)
+ggsave(paste0("./model_output/RF_Millennial_sens_pdp_",
+              Sys.Date(), ".jpeg"), width = 10, height = 6)
