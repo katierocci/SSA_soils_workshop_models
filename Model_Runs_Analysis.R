@@ -6,9 +6,9 @@ library(tidyverse)
 library(ggpubr)
 
 ## Load default and fitted model runs
-default_run <- read.csv("model_output/both_model_results_default_run_2025-10-08.csv") %>% 
+default_run <- read.csv("model_output/both_model_results_default_run_2025-10-10.csv") %>% 
   mutate(ModelRun = "default") 
-fitted_run <- read.csv("model_output/both_model_results_fitted_run_2025-10-08.csv") %>% 
+fitted_run <- read.csv("model_output/both_model_results_fitted_run_2025-10-10.csv") %>% 
   mutate(ModelRun = "fitted")
 
 ## Load AfSIS data
@@ -45,10 +45,9 @@ extract_lm_stats <- function(df, type_filter, modelrun_filter) {
   glance_lm <- broom::glance(lm_fit)
   
   # RMSE calculation
-  rmse <- sqrt(mean(lm_fit$residuals^2))
+  rmse <- sqrt(mean((data_sub$Soil_Organic_Carbon_kg_m2_obs - data_sub$Soil_Organic_Carbon_kg_m2_mod)^2))
   
   # p-value of slope (coefficient on Soil_Organic_Carbon_kg_m2_obs)
-  # It's the 2nd coefficient
   p_value <- coef(summary_lm)[2, "Pr(>|t|)"]
   
   tibble(
