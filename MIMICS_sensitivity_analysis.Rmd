@@ -24,22 +24,26 @@ source(here("functions/calc_Tpars.R"))
 source(here("functions/MIMICS_calc_steady_state_pools.R"))
 
 ## AfSIS data
-afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is = T)
-
+#afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is = T)
 ## Prepare forcing data
-forcing_data <- afsis_data %>% 
-  tibble::rowid_to_column("Set") %>% 
-  filter(Depth == 'Topsoil')
+#forcing_data <- afsis_data %>% 
+#  tibble::rowid_to_column("Set") %>% 
+#  filter(Depth == 'Topsoil')
 
-#match MIMICS names
+#simulated input data
+forcing_data <- read.csv("forcing_data/sensitivity_analysis_simulated_input_data_2025-10-13.csv", as.is = T)
+
+
+#match MIMICS names - comment out Set and depth if using simulated inputs
 forcing_data_MIMICS <- forcing_data %>% mutate(npp_modis.gC.m2.yr=npp_modis*1000) %>%
     drop_na(npp_modis.gC.m2.yr, pH, Clay_2um, LIG_N, stemp, sm, Clay_63um, bd_extracted) %>%
-                                               select(Set, ANPP = npp_modis.gC.m2.yr, 
+                                               select(#Set, 
+                                               ANPP = npp_modis.gC.m2.yr, 
                                                CLAY = Clay_2um,
                                                lig_N = LIG_N,
                                                TSOI = stemp,
-                                               theta_liq = sm,
-                                               Depth = Depth)
+                                               theta_liq = sm)#,
+                                               #Depth = Depth)
 
 ```
 
@@ -129,6 +133,6 @@ sampled_grid <- input_grid[sample(nrow(input_grid), 1000), ]
 MIMruns <- input_grid %>% split(1:nrow(input_grid)) %>% map(~ MIMICS_SS(df=.))
 MIMICS_ss_AllSites <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
 #export data for statistical analysis
-write.csv(MIMICS_ss_AllSites, 'MIMICS_SensitivityAnalysisOutput_091725.csv')
+write.csv(MIMICS_ss_AllSites, 'model_output/MIMICS_SensitivityAnalysisOutput_101425.csv')
 ```
 
