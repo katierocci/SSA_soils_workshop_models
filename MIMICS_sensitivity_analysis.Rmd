@@ -130,9 +130,12 @@ sampled_grid <- input_grid[sample(nrow(input_grid), 1000), ]
 #subset of input grid
 #MIMruns <- sampled_grid %>% split(1:nrow(sampled_grid)) %>% map(~ MIMICS_SS(df=.))
 #full input grid
-MIMruns <- input_grid %>% split(1:nrow(input_grid)) %>% map(~ MIMICS_SS(df=.))
+#MIMruns <- input_grid %>% split(1:nrow(input_grid)) %>% map(~ MIMICS_SS(df=.))
+#MIMICS_ss_AllSites <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
+#forcing data directly
+MIMruns <- forcing_data_MIMICS %>% split(1:nrow(forcing_data_MIMICS)) %>% map(~ MIMICS_SS(df=.))
 MIMICS_ss_AllSites <- lapply(MIMruns, MIMICS_SS_format) %>% bind_rows()
 #export data for statistical analysis
-write.csv(MIMICS_ss_AllSites, 'model_output/MIMICS_SensitivityAnalysisOutput_101425.csv')
+write.csv(MIMICS_ss_AllSites, 'model_output/MIMICS_SensitivityAnalysisOutput_110525.csv')
 ```
 
