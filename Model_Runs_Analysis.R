@@ -13,7 +13,7 @@ fitted_run <- read.csv("model_output/both_model_results_fitted_run_2025-10-10.cs
 
 ## Load AfSIS data
 afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is = T) %>% 
-  filter(Depth == "Topsoil")
+  tibble::rowid_to_column("Set")
 
 ## merge both model datasets
 both_runs <- default_run %>% 
@@ -107,7 +107,7 @@ ggsave(paste0("./model_output/ModelFits_MIMICS_Millennial_DefaultFitted_",
 
 ## Bias plots
 afsis_red <- afsis_data %>% 
-  tibble::rowid_to_column("Set") %>% 
+  filter(Depth == "Topsoil") %>% 
   filter(CORG <= 20) %>% 
   dplyr::select(Set, Longitude, Latitude, Region, Country, Site, Cluster, Plot,
                 Clay_2um, Clay_63um, pH, Am_Ox_Al, Am_Ox_Fe, Caex, Clay_1_1,
@@ -282,7 +282,6 @@ annotate_figure(
             ncol = 4, nrow = 2),  
   left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 14))
 
-
 ggsave(paste0("./model_output/BiasPlots_MIMICS_Millennial_Fitted_soil_",
               Sys.Date(), ".jpeg"), height = 6, width = 12) 
 
@@ -293,5 +292,6 @@ s10 <- bias_plot_fun_forc_prop(Latitude, "Latitude")
 annotate_figure(  
   ggarrange(s9, s10, common.legend = TRUE),  
   left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 14))
+
 ggsave(paste0("./model_output/BiasPlots_MIMICS_Millennial_Fitted_long_lat_",
               Sys.Date(), ".jpeg"), height = 6, width = 8) 
