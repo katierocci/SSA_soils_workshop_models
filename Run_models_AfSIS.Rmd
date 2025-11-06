@@ -46,7 +46,7 @@ forcing_data <- afsis_data %>%
 forcing_data_MIMICS <- forcing_data %>% 
   mutate(npp_modis.gC.m2.yr = npp_modis*1000) %>%
   drop_na(npp_modis.gC.m2.yr, pH, Clay_2um, LIG_N, stemp, sm, Clay_63um, bd_extracted) %>%
-  select(Set, ANPP = npp_modis.gC.m2.yr, 
+  select(Set, SSN, ANPP = npp_modis.gC.m2.yr, 
          CLAY = Clay_2um,
          lig_N = LIG_N,
          TSOI = stemp,
@@ -142,6 +142,10 @@ CENTURY_ss_AllSites <- as.data.frame(cbind(forcing_data_Century, final_results))
          Type = "Century")
 
 # write.csv(CENTURY_ss_AllSites, "./model_output/Century_results.csv")
+
+# View final result
+hist(CENTURY_ss_AllSites$Soil_Organic_Carbon_kg_m2)
+
 ```
 
 #Century without temp and PPT
@@ -196,7 +200,7 @@ CUE_MULT <<- CUE_MULT*MCMC_SingleBest$CUE_x
 #run the model for all sites
 MIMruns <- forcing_data_MIMICS %>% 
   split(1:nrow(forcing_data_MIMICS)) %>% 
-  map(~ MIMICS_SS(df = .))
+  purrr::map(~ MIMICS_SS(df = .))
 
 MIMICS_ss_AllSites <- lapply(MIMruns, MIMICS_SS_format) %>% 
   bind_rows()
@@ -288,14 +292,16 @@ hist(Millennial_ss_AllSites$Soil_Organic_Carbon_kg_m2)
 
 # Combine output
 ```{r}
-both_models <- full_join(MIMICS_ss_AllSites %>% 
-                           select(Set = SET, Soil_Organic_Carbon_kg_m2, Type), 
-                         Millennial_ss_AllSites %>% 
-                           select(Set, Soil_Organic_Carbon_kg_m2, Type)) %>% 
-  full_join(forcing_data %>% 
-              mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100, 
-                     Type = "Observed") %>% 
-              select(Set, Soil_Organic_Carbon_kg_m2, Type))
+both_models <- rbind(MIMICS_ss_AllSites %>% 
+                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type), 
+                     Millennial_ss_AllSites %>% 
+                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+                     CENTURY_ss_AllSites %>% 
+                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+                     forcing_data %>% 
+                       mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100, 
+                              Type = "Observed") %>% 
+                       select(SSN, Soil_Organic_Carbon_kg_m2, Type)) 
 
 # Default Runs
 # write.csv(both_models, row.names = FALSE,
