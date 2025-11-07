@@ -22,28 +22,32 @@ source(here("functions/run_functions.R")) #R script that contains calls to run m
 source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
 
 ## AfSIS data
-afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is = T)
+forcing_data <- read.csv("forcing_data/sensitivity_analysis_simulated_input_data_2025-10-13.csv", as.is=T)
 
 ## Prepare forcing data
-forcing_data <- afsis_data %>% 
+forcing_data <- forcing_data %>% 
   tibble::rowid_to_column("Set") %>% 
   filter(Depth == 'Topsoil')
 
 #match Millennial names
-forcing_data_Millennial <- forcing_data %>% mutate(npp_modis.gC.m2.d=npp_modis*1000/365) %>%
+forcing_data_Millennial <- forcing_data %>% 
+  mutate(npp_modis.gC.m2.d = npp_modis*1000/365) %>%
   drop_na(npp_modis.gC.m2.d, pH, Clay_2um, LIG_N, stemp, sm, Clay_63um, bd_extracted) %>%
-                                dplyr::select(Set, param_pH = pH, 
-                                   param_bulkd = bd_extracted, 
-                                   param_claysilt = Clay_63um, 
-                                   forc_st = stemp, 
-                                   forc_sw = sm, 
-                                   forc_npp = npp_modis.gC.m2.d,
-                                   Latitude = Latitude,
-                                   Longitude = Longitude,
-                                   SSN = SSN,
-                                   Depth = Depth) %>% 
-                            mutate(param_bulkd = param_bulkd*1000*0.2, param_pc = 0.86, #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
-                                   site_id = row_number())
+  dplyr::select(Set, param_pH = pH, 
+                param_bulkd = bd_extracted, 
+                param_claysilt = Clay_63um, 
+                forc_st = stemp, 
+                forc_sw = sm, 
+                forc_npp = npp_modis.gC.m2.d,
+                Latitude = Latitude,
+                Longitude = Longitude,
+                SSN = SSN,
+                Depth = Depth) %>% 
+  mutate(param_bulkd = param_bulkd*1000*0.2, param_pc = 0.86, #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
+         site_id = row_number())
+
+input_grid <- forcing_data_Millennial
+
 ```
 
 
@@ -57,110 +61,132 @@ names(parameters) <- parameters.file$V1
 
 #load function to find min and maxes of columns
 ```{r}
-find_min_max_df <- function(df, cols) {
-  # Check that all columns exist
-  missing <- setdiff(cols, names(df))
-  if (length(missing) > 0) {
-    stop(paste("Columns not found:", paste(missing, collapse = ", ")))
-  }
-  
-  # Compute min and max for each column
-  result <- data.frame(
-    column = cols,
-    min = sapply(cols, function(col) min(df[[col]], na.rm = TRUE)),
-    max = sapply(cols, function(col) max(df[[col]], na.rm = TRUE)),
-    row.names = NULL
-  )
-  
-  return(result)
-}
+# find_min_max_df <- function(df, cols) {
+#   # Check that all columns exist
+#   missing <- setdiff(cols, names(df))
+#   if (length(missing) > 0) {
+#     stop(paste("Columns not found:", paste(missing, collapse = ", ")))
+#   }
+#   
+#   # Compute min and max for each column
+#   result <- data.frame(
+#     column = cols,
+#     min = sapply(cols, function(col) min(df[[col]], na.rm = TRUE)),
+#     max = sapply(cols, function(col) max(df[[col]], na.rm = TRUE)),
+#     row.names = NULL
+#   )
+#   
+#   return(result)
+# }
 ```
 
 
 #Sensitivity analysis
 ```
-In this sensitivity analysis, our overall objective is to understand how MIMICS output varies over the full ange of data available in the AfSIS dataset
+In this sensitivity analysis, our overall objective is to understand how Millennial output varies over the full range of data available in the AfSIS dataset
 ```
 ##Define model inputs
 ```
 Defines ranges of input values based on observed summary statistics for all data from AfSIS dataset
 ```
 ```{r}
-#Define ranges
-
-#find min and max of input columns
-inputs_max_min <- find_min_max_df(forcing_data_Millennial, c("forc_npp", "param_claysilt", "param_pH", "forc_st", "forc_sw","param_bulkd"))
-
-##STOPPED HERE
-
-#NPP (gC/m2/yr) 0s?
-NPP_seq = seq(inputs_max_min[inputs_max_min$column == "forc_npp", "min"],inputs_max_min[inputs_max_min$column == "forc_npp", "max"], length.out=10)
-#CLAY (percent)
-CLAY_seq = seq(inputs_max_min[inputs_max_min$column == "param_claysilt", "min"],inputs_max_min[inputs_max_min$column == "param_claysilt", "max"], length.out=10)
-#pH (unitless)
-pH_seq = seq(inputs_max_min[inputs_max_min$column == "param_pH", "min"],inputs_max_min[inputs_max_min$column == "param_pH", "max"], length.out=10)
-#Soil Temperature (C)
-TSOI_seq = seq(inputs_max_min[inputs_max_min$column == "forc_st", "min"],inputs_max_min[inputs_max_min$column == "forc_st", "max"], length.out=10)
-#Soil moisture (volumetric soil moisture, fraction)
-theta_seq = seq(inputs_max_min[inputs_max_min$column == "forc_sw", "min"],inputs_max_min[inputs_max_min$column == "forc_sw", "max"], length.out=10)
-#Bulk Density (kg/m3 for the top 20cm)
-bulkd_seq = seq(inputs_max_min[inputs_max_min$column == "param_bulkd", "min"],inputs_max_min[inputs_max_min$column == "param_bulkd", "max"], length.out=10)
-
-
-# Generate all combinations of the input values
-input_grid <- expand.grid(
-  forc_npp = NPP_seq,
-  param_claysilt = CLAY_seq,
-  param_pH = pH_seq,
-  forc_st = TSOI_seq,
-  forc_sw = theta_seq,
-  param_bulkd = bulkd_seq
-)
-input_grid$param_pc <- 0.86
-
-# Randomly sample 1000 rows from the param_grid
-set.seed(123)  # for reproducibility
-sampled_grid <- input_grid[sample(nrow(input_grid), 1000), ]
+# #Define ranges
+# 
+# #find min and max of input columns
+# inputs_max_min <- find_min_max_df(forcing_data_Millennial, c("forc_npp", "param_claysilt", "param_pH", "forc_st", "forc_sw","param_bulkd"))
+# 
+# ##STOPPED HERE
+# 
+# #NPP (gC/m2/yr) 0s?
+# NPP_seq = seq(inputs_max_min[inputs_max_min$column == "forc_npp", "min"],inputs_max_min[inputs_max_min$column == "forc_npp", "max"], length.out=10)
+# #CLAY (percent)
+# CLAY_seq = seq(inputs_max_min[inputs_max_min$column == "param_claysilt", "min"],inputs_max_min[inputs_max_min$column == "param_claysilt", "max"], length.out=10)
+# #pH (unitless)
+# pH_seq = seq(inputs_max_min[inputs_max_min$column == "param_pH", "min"],inputs_max_min[inputs_max_min$column == "param_pH", "max"], length.out=10)
+# #Soil Temperature (C)
+# TSOI_seq = seq(inputs_max_min[inputs_max_min$column == "forc_st", "min"],inputs_max_min[inputs_max_min$column == "forc_st", "max"], length.out=10)
+# #Soil moisture (volumetric soil moisture, fraction)
+# theta_seq = seq(inputs_max_min[inputs_max_min$column == "forc_sw", "min"],inputs_max_min[inputs_max_min$column == "forc_sw", "max"], length.out=10)
+# #Bulk Density (kg/m3 for the top 20cm)
+# bulkd_seq = seq(inputs_max_min[inputs_max_min$column == "param_bulkd", "min"],inputs_max_min[inputs_max_min$column == "param_bulkd", "max"], length.out=10)
+# 
+# 
+# # Generate all combinations of the input values
+# input_grid <- expand.grid(
+#   forc_npp = NPP_seq,
+#   param_claysilt = CLAY_seq,
+#   param_pH = pH_seq,
+#   forc_st = TSOI_seq,
+#   forc_sw = theta_seq,
+#   param_bulkd = bulkd_seq
+# )
+# input_grid$param_pc <- 0.86
+# 
+# # Randomly sample 1000 rows from the param_grid
+# set.seed(123)  # for reproducibility
+# sampled_grid <- input_grid[sample(nrow(input_grid), 1000), ]
 ```
 
 ##Run input data combinations for all models
 ```{r}
 Start.Timer <- Sys.time()
-#subset of input grid, comment next line for full input grid
-#input_grid <- sampled_grid
 
-# Function to run model for one row of site parameters
 run_model_for_site <- function(site_row, base_params) {
   # Copy full parameter list
   site_params <- as.list(base_params)
   
-  # Override default site-specific value with values from AfSIS
+  # Override with site-specific parameters
   site_params$param_pH       <- as.numeric(site_row$param_pH)
   site_params$param_bulkd    <- as.numeric(site_row$param_bulkd)
   site_params$param_pc       <- as.numeric(site_row$param_pc)
   site_params$param_claysilt <- as.numeric(site_row$param_claysilt)
-    
-# Format input data
-input_for_site <- data.frame(
-  forc_st  = rep(as.numeric(site_row$forc_st), 365),
-  forc_sw  = rep(as.numeric(site_row$forc_sw), 365),
-  forc_npp = rep(as.numeric(site_row$forc_npp), 365),
-  stringsAsFactors = FALSE
-)
-
-# Run the model with an error-catching wrapper
+  
+  # Format input data
+  input_for_site <- data.frame(
+    forc_st  = rep(as.numeric(site_row$forc_st), 365),
+    forc_sw  = rep(as.numeric(site_row$forc_sw), 365),
+    forc_npp = rep(as.numeric(site_row$forc_npp), 365),
+    stringsAsFactors = FALSE
+  )
+  
+  # Run the model with error and warning catching
   result <- tryCatch({
-    Solve_Model(input_for_site, derivs_V2_MM, site_params)
-  }, error = function(e) {
+    warnings_list <- character(0)
+    
+    model_out <- withCallingHandlers(
+      {
+        Solve_Model(input_for_site, derivs_V2_MM, site_params)
+      },
+      warning = function(w) {
+        # Capture the warning message
+        warnings_list <<- c(warnings_list, w$message)
+        invokeRestart("muffleWarning")  # prevent printing it to console
+      }
+    )
+    
+    # Successful run → convert to dataframe
+    pool_df <- as.data.frame(t(model_out$y))
+    pool_df$site_id <- site_row$site_id
+    pool_df$error_message <- NA_character_
+    pool_df$warning_message <- if (length(warnings_list) > 0) {
+      paste(warnings_list, collapse = " | ")
+    } else {
+      NA_character_
+    }
+    pool_df
+  },
+  error = function(e) {
+    # Error case → record site_id and message
     warning(paste("Model failed for site:", site_row$site_id, ":", e$message))
-    return(NULL)
+    data.frame(
+      site_id = site_row$site_id,
+      error_message = e$message,
+      warning_message = NA_character_,
+      stringsAsFactors = FALSE
+    )
   })
-
-  if (is.null(result)) return(NULL)
-
-  pool_df <- as.data.frame(t(result$y))
-  pool_df$site_id <- site_row$site_id
-  return(pool_df)
+  
+  return(result)
 }
 
 # Apply model across all rows of the site parameter dataframe
@@ -180,5 +206,43 @@ write.csv(Millennial_ss_AllSites, 'Millennial_SensitivityAnalysisOutput_091725.c
 
 End.Timer <- Sys.time()
 End.Timer - Start.Timer
+```
+
+#Look into the steady state situation
+```{r}
+mf <- Millennial_ss_AllSites %>% filter(warning_message == "steady-state not reached")
+#0.2% of cases; 2152/1000000
+
+mf_in <- mf %>% select(forc_npp:param_pc)
+
+plot(mf$forc_npp, mf$param_claysilt)
+
+NPP_seq; unique(mf$forc_npp) #four largest NPP
+CLAY_seq; unique(mf$param_claysilt) #same
+pH_seq; unique(mf$param_pH) #same
+TSOI_seq; unique(mf$forc_st) #two coldest temps
+bulkd_seq; unique(mf$param_bulkd) #same
+theta_seq; unique(mf$forc_sw) #one driest soil moisture
+
+Start.Timer <- Sys.time()
+
+# Apply model across all rows of the site parameter dataframe
+results_list <- apply(mf_in, 1, function(row) {
+  row <- as.list(row)  # Convert row to list for easy referencing
+  run_model_for_site(row, parameters)
+})
+
+# Combine all into one dataframe
+Millennial_ss <- dplyr::bind_rows(results_list)
+
+# Merge model outputs with original site parameters if needed
+Millennial_ss_AllSites <- mf_in %>% cbind(Millennial_ss) %>%
+mutate(Soil_Organic_Carbon_kg_m2 = (POM + LMWC + AGG + MIC + MAOM) / 1000)
+
+write.csv(Millennial_ss_AllSites, 'Millennial_SensitivityAnalysisOutput_longerNoSSruns.csv')
+
+End.Timer <- Sys.time()
+End.Timer - Start.Timer
+#over 5 hours with error message printing
 ```
 
