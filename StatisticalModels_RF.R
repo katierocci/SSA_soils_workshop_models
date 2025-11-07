@@ -17,7 +17,7 @@ library(scales)
 ## Random forest
 
 # Load and prepare AfSIS data
-afsis <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is = T)
+afsis <- read.csv("forcing_data/afsis_ref_updated9.csv", as.is = T)
 
 afsis_data <- afsis %>% 
   tibble::rowid_to_column("Set") %>% 
@@ -605,36 +605,36 @@ ggsave(paste0("./model_output/RF_MIMICS_sens_pdp_",
               Sys.Date(), ".jpeg"), width = 10, height = 6)
 
 ## Millennial ##
-millennial_sens <- read.csv("./model_output/Millennial_SensitivityAnalysisOutput_102225.csv", as.is = T) %>% 
+millennial_sens <- read.csv("./model_output/Millennial_SensitivityAnalysisOutput_110525.csv", as.is = T) %>% 
   #remove model runs that did not reach steady state and have 0 C in MAOM fraction
   filter(MAOM > 0)
 head(millennial_sens)
 summary(millennial_sens$MAOM)
 
-# Create a smaller dataset for faster computing
-set.seed(42)
-n_sample <- min(100000, nrow(millennial_sens))  # Use max 100000 rows
-sample_idx <- sample(nrow(millennial_sens), n_sample)
-millennial_sens_small <- millennial_sens[sample_idx, ]
+# # Create a smaller dataset for faster computing
+# set.seed(42)
+# n_sample <- min(100000, nrow(millennial_sens))  # Use max 100000 rows
+# sample_idx <- sample(nrow(millennial_sens), n_sample)
+# millennial_sens_small <- millennial_sens[sample_idx, ]
 
 # Check data range
-p1 <- millennial_sens_small %>% 
+p1 <- millennial_sens %>% 
   ggplot(aes(x = forc_npp, y = Soil_Organic_Carbon_kg_m2)) +
   geom_point() +
   geom_rug()
-p2 <- millennial_sens_small %>% 
+p2 <- millennial_sens %>% 
   ggplot(aes(x = param_claysilt, y = Soil_Organic_Carbon_kg_m2)) +
   geom_point() +
   geom_rug()
-p3 <- millennial_sens_small %>% 
+p3 <- millennial_sens %>% 
   ggplot(aes(x = param_pH, y = Soil_Organic_Carbon_kg_m2)) +
   geom_point() +
   geom_rug()
-p4 <- millennial_sens_small %>% 
+p4 <- millennial_sens %>% 
   ggplot(aes(x = forc_st, y = Soil_Organic_Carbon_kg_m2)) +
   geom_point() +
   geom_rug()
-p5 <- millennial_sens_small %>% 
+p5 <- millennial_sens %>% 
   ggplot(aes(x = forc_sw, y = Soil_Organic_Carbon_kg_m2)) +
   geom_point() +
   geom_rug()
@@ -642,7 +642,7 @@ ggarrange(p1, p2, p3, p4, p5)
 ggsave(paste0("./model_output/Millennial_sens_data_range_",
               Sys.Date(), ".jpeg"), width = 10, height = 6)
 
-millennial_sens_df_rf <- millennial_sens_small %>% 
+millennial_sens_df_rf <- millennial_sens %>% 
   #select input variables: SOC stocks, NPP, clay 2um, lignin N, stemp, sm
   dplyr::select(Soil_Organic_Carbon_kg_m2, forc_npp, param_claysilt, param_pH, 
                 forc_st, forc_sw)
@@ -669,7 +669,7 @@ millennial_sens_rf <- mlr3::resample(task = millennial_sens_task_rf,
                                      learner = millennial_sens_lrn_rf, 
                                      resampling = resampling, store_models = TRUE)
 
-# R2 = 0.94, mae = 1.45, rmse = 1.94
+# R2 = 0.99, mae = 0.11, rmse = 0.21
 millennial_sens_rf$aggregate(measures = msrs(c("regr.rsq", "regr.mae", "regr.rmse")))
 
 millennial_sens_rf_pred <- millennial_sens_rf$prediction(predict_sets = "test")
@@ -685,9 +685,9 @@ millennial_sens_rf_pred_df %>%
   theme_bw(base_size = 16) +
   theme(axis.text = element_text(color = "black")) +
   scale_y_continuous("Observed SOC stocks [kg/m2]", 
-                     limits = c(-5,80), expand = c(0,0)) +
+                     limits = c(-2,40), expand = c(0,0)) +
   scale_x_continuous("Predicted SOC stocks [kg/m2]", 
-                     limits = c(-5,80), expand = c(0,0))
+                     limits = c(-2,40), expand = c(0,0))
 ggsave(paste0("./model_output/RF_Millennial_sens_obs_pred_cv_10f_",
               Sys.Date(), ".jpeg"), width = 6, height = 6)
 
@@ -713,7 +713,7 @@ millennial_sens_vi_df %>%
   theme(axis.text = element_text(color = "black")) +
   scale_x_discrete("") +
   scale_y_continuous("Relative explained variation (%)", expand = c(0,0),
-                     limits = c(0,55))
+                     limits = c(0,70))
 ggsave(paste0("./model_output/RF_Millennial_sens_vi_cv_10f_",
               Sys.Date(), ".jpeg"), width = 8, height = 6)
 
@@ -731,7 +731,7 @@ millennial_sens_model_rf <- Predictor$new(millennial_sens_lrn_rf_pdp,
                                           data = millennial_sens_df_rf)
 
 # Increase the maximum allowed size for parallel processing
-options(future.globals.maxSize = 4000 * 1024^2)  # ~2 GB
+options(future.globals.maxSize = 4000 * 1024^2)  # ~4 GB
 
 # Create a smaller dataset for PDP calculation
 set.seed(42)

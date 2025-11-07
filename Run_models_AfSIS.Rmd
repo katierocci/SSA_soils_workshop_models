@@ -29,6 +29,9 @@ source(here("functions/MIMICS_calc_steady_state_pools.R"))
 #load millennial model components
 source(here("functions/run_functions.R")) #R script that contains calls to run model
 source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
+
+#load century model components
+source(here("CenturyFunction/CenturyFunction_mod.R"))
 ```
 
 #Load forcing data
@@ -75,42 +78,40 @@ forcing_data_Millennial <- forcing_data %>%
 # https://search.r-project.org/CRAN/refmans/SoilR/html/CenturyModel.html
 
 forcing_data_Century <- forcing_data %>% 
-  #does this needs to be per month to match monthly timestep of the model?
-  mutate(npp_modis.gC.m2.month = npp_modis*1000/12, #Century units are mass/area/time
+  mutate(npp_modis.gC.m2.week = npp_modis*1000/52, #Century units are mass/area/time
          silt = (Clay_63um - Clay_2um)/100,  #AfSIS % to fraction in Century
          clay = Clay_2um/100,  #AfSIS % to fraction in Century
-         surfaceIn = npp_modis.gC.m2.month/2, #Assume 50/50 split
-         soilIn = npp_modis.gC.m2.month/2, 
+         surfaceIn = npp_modis.gC.m2.week/2, #Assume 50/50 split
+         soilIn = npp_modis.gC.m2.week/2, 
          # is LIG_N a ratio or percent?; if ratio no need to divide by 100
-         LN = LIG_N/100, #percent in AfSIS to fraction in Century
+         LN = LIG_N, #percent in AfSIS to fraction in Century
          Ls = LIG/100) %>% #percent in AfSIS to fraction in Century
-  drop_na(npp_modis.gC.m2.month, pH, Clay_2um, LN, stemp, sm, Clay_63um, bd_extracted) %>%
-  dplyr::select(SSN, PET, MAP, MAT, LN, clay, silt, Ls, surfaceIn, soilIn, Depth)
+  drop_na(npp_modis.gC.m2.week, pH, Clay_2um, LN, stemp, sm, Clay_63um, bd_extracted) %>%
+  dplyr::select(SSN, Set, PET, MAP, MAT, LN, clay, silt, Ls, surfaceIn, soilIn, Depth)
 ```
 
 #Run Century at AfSIS sites
 ```{r}
 #run for 1000 years
-mnths = seq(0,12*1000)
+time = seq(0,52*1000)
 
 results <- lapply(seq_len(nrow(forcing_data_Century)), function(i) {
   row <- forcing_data_Century[i, ]
 
 # --- Step 1: Compute environmental modifiers ---
-  # Use your temperature and moisture columns here (adjust names as needed)
+  # Use default century temperature and moisture modifiers
   fT <- fT.Century1(row$MAT)       # Air temperature in degrees C
   fW <- fW.Century(row$MAP/12, row$PET/12) # PPT monthly precip, PET = monthly PET, both in mm
   xi_val <- fT * fW                   # combine multiplicatively
 
-  # If your t (mnths) is a time vector, make xi a data frame with constant values
-  xi_df <- data.frame(time = mnths, xi = rep(xi_val, length(mnths)))
+  # If your t (time) is a time vector, make xi a data frame with constant values
+  xi_df <- data.frame(time = time, xi = rep(xi_val, length(mnths)))
 
   # --- Step 2: Run the Century model ---
-  cm <- CenturyModel(
-    t = mnths,
+  cm <- CenturyModel_mod(
+    t = time,
     surfaceIn = row$surfaceIn,
     soilIn = row$soilIn,
-    #should this also be row$LN and row$Ls?
     LN = row$LN,
     Ls = row$Ls,
     clay = row$clay,
@@ -304,6 +305,15 @@ both_models <- rbind(MIMICS_ss_AllSites %>%
                        select(SSN, Soil_Organic_Carbon_kg_m2, Type)) 
 
 # Default Runs
+# both_models <- rbind(MIMICS_ss_AllSites %>% 
+#                        dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type), 
+#                      Millennial_ss_AllSites %>% 
+#                        dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+#                      forcing_data %>% 
+#                        mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100, 
+#                               Type = "Observed") %>% 
+#                        select(SSN, Soil_Organic_Carbon_kg_m2, Type))
+# 
 # write.csv(both_models, row.names = FALSE,
 #           paste0("./model_output/both_model_results_default_run_",
 #           Sys.Date(), ".csv"))
