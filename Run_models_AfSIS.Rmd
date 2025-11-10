@@ -78,19 +78,18 @@ forcing_data_Millennial <- forcing_data %>%
 # https://search.r-project.org/CRAN/refmans/SoilR/html/CenturyModel.html
 
 forcing_data_Century <- forcing_data %>% 
-  mutate(npp_modis.gC.m2.week = npp_modis*1000/52, #Century units are mass/area/time
+  mutate(npp_modis.gC.m2.week = npp_modis*1000/52, #Century units are mass/area/week
          silt = (Clay_63um - Clay_2um)/100,  #AfSIS % to fraction in Century
          clay = Clay_2um/100,  #AfSIS % to fraction in Century
          surfaceIn = npp_modis.gC.m2.week/2, #Assume 50/50 split
-         soilIn = npp_modis.gC.m2.week/2, 
-         # is LIG_N a ratio or percent?; if ratio no need to divide by 100
-         LN = LIG_N, #percent in AfSIS to fraction in Century
+         soilIn = npp_modis.gC.m2.week/2,
+         LN = LIG_N, 
          Ls = LIG/100) %>% #percent in AfSIS to fraction in Century
   drop_na(npp_modis.gC.m2.week, pH, Clay_2um, LN, stemp, sm, Clay_63um, bd_extracted) %>%
   dplyr::select(SSN, Set, PET, MAP, MAT, LN, clay, silt, Ls, surfaceIn, soilIn, Depth)
 ```
 
-#Run Century at AfSIS sites
+#Run Century at AfSIS sites - default
 ```{r}
 #run for 1000 years
 time = seq(0,52*1000)
@@ -293,25 +292,16 @@ hist(Millennial_ss_AllSites$Soil_Organic_Carbon_kg_m2)
 
 # Combine output
 ```{r}
-both_models <- rbind(MIMICS_ss_AllSites %>% 
-                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type), 
-                     Millennial_ss_AllSites %>% 
-                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-                     CENTURY_ss_AllSites %>% 
-                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-                     forcing_data %>% 
-                       mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100, 
-                              Type = "Observed") %>% 
-                       select(SSN, Soil_Organic_Carbon_kg_m2, Type)) 
-
 # Default Runs
-# both_models <- rbind(MIMICS_ss_AllSites %>% 
-#                        dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type), 
-#                      Millennial_ss_AllSites %>% 
+# both_models <- rbind(MIMICS_ss_AllSites %>%
 #                        dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-#                      forcing_data %>% 
-#                        mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100, 
-#                               Type = "Observed") %>% 
+#                      Millennial_ss_AllSites %>%
+#                        dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+#                      CENTURY_ss_AllSites %>% 
+#                        dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+#                      forcing_data %>%
+#                        mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
+#                               Type = "Observed") %>%
 #                        select(SSN, Soil_Organic_Carbon_kg_m2, Type))
 # 
 # write.csv(both_models, row.names = FALSE,
@@ -319,6 +309,14 @@ both_models <- rbind(MIMICS_ss_AllSites %>%
 #           Sys.Date(), ".csv"))
 
 # Fitted Runs
+both_models <- rbind(MIMICS_ss_AllSites %>%
+                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+                     Millennial_ss_AllSites %>%
+                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+                     forcing_data %>%
+                       mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
+                              Type = "Observed") %>%
+                       select(SSN, Soil_Organic_Carbon_kg_m2, Type))
 write.csv(both_models, row.names = FALSE,
           paste0("./model_output/both_model_results_fitted_run_",
           Sys.Date(), ".csv"))

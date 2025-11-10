@@ -6,9 +6,9 @@ library(tidyverse)
 library(ggpubr)
 
 ## Load default and fitted model runs
-default_run <- read.csv("model_output/both_model_results_default_run_2025-11-06.csv") %>% 
+default_run <- read.csv("model_output/both_model_results_default_run_2025-11-10.csv") %>% 
   mutate(ModelRun = "default") 
-fitted_run <- read.csv("model_output/both_model_results_fitted_run_2025-11-06.csv") %>% 
+fitted_run <- read.csv("model_output/both_model_results_fitted_run_2025-11-10.csv") %>% 
   mutate(ModelRun = "fitted")
 
 ## Load AfSIS data
