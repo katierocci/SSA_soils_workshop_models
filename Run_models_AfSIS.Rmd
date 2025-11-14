@@ -22,7 +22,6 @@ safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#33228
 
 #load mimics model components
 source(here("ODEs/RXEQ.R"))
-source(here("parameters/MIMICS_parameters_sandbox_20231129.R"))
 source(here("functions/calc_Tpars.R"))
 source(here("functions/MIMICS_calc_steady_state_pools.R"))
 
@@ -186,16 +185,20 @@ hist(CENTURY_ss_AllSites$Soil_Organic_Carbon_kg_m2)
 
 #Run MIMICS at AfSIS sites
 ```{r}
+#load MIMICS parameters here to ensure these are not changed before running
+   #just exist in global environment so are susceptible to overwriting
+source(here("parameters/MIMICS_parameters_sandbox_20231129.R"))
+
 #IF using parameterized MIMICS uncomment lines of code preceding model run
-MCMC_SingleBest <- read.csv('AfSIS_MIMICS_MCMC_Parameterized.csv')
-Tau_MULT <<- Tau_MULT*MCMC_SingleBest$Tau_x
-desorb_MULT <<- desorb_MULT*MCMC_SingleBest$desorb_x
-fPHYS_MULT <<- fPHYS_MULT*MCMC_SingleBest$fPHYS_x
-Vslope_MULT <<- Vslope_MULT*MCMC_SingleBest$Vslope_x
-Vint_MULT <<- Vint_MULT*MCMC_SingleBest$Vint_x
-Kslope_MULT <<- Kslope_MULT*MCMC_SingleBest$Kslope_x
-Kint_MULT <<- Kint_MULT*MCMC_SingleBest$Kint_x
-CUE_MULT <<- CUE_MULT*MCMC_SingleBest$CUE_x
+# MCMC_SingleBest <- read.csv('AfSIS_MIMICS_MCMC_Parameterized.csv')
+# Tau_MULT <<- Tau_MULT*MCMC_SingleBest$Tau_x
+# desorb_MULT <<- desorb_MULT*MCMC_SingleBest$desorb_x
+# fPHYS_MULT <<- fPHYS_MULT*MCMC_SingleBest$fPHYS_x
+# Vslope_MULT <<- Vslope_MULT*MCMC_SingleBest$Vslope_x
+# Vint_MULT <<- Vint_MULT*MCMC_SingleBest$Vint_x
+# Kslope_MULT <<- Kslope_MULT*MCMC_SingleBest$Kslope_x
+# Kint_MULT <<- Kint_MULT*MCMC_SingleBest$Kint_x
+# CUE_MULT <<- CUE_MULT*MCMC_SingleBest$CUE_x
 
 #run the model for all sites
 MIMruns <- forcing_data_MIMICS %>% 
