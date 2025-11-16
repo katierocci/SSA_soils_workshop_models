@@ -30,15 +30,15 @@ forcing_data_Century <- forcing_data %>%
                                    drop_na(Litterfall.gC.m2.yr, NPP.gC.m2.d, Clay_2um, Clay_63um, SoilTMP_C, SoilMoi_m3m3, pH, bd_extracted, LIG_N) %>%
   mutate(npp_modis.gC.m2.d = npp_modis*1000/365, #Century units now same as Millennial
          SSN_row_ID = row_number(),
-         param_claysilt = Clay_63um,
+         param_claysilt = Clay_63um/100, #fraction in Century
          forc_st = stemp, 
          forc_sw = sm, 
          forc_npp = npp_modis.gC.m2.d,
          LN = LIG_N, 
-         Ls = LIG/100,
+         LigFrac = LIG/100,
          Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
          input_to_metlitter = 0.85 - 0.013 * LN) %>%
-  dplyr::select(SSN_row_ID, Set, forc_st, forc_sw, forc_npp, LN, param_claysilt, Ls, Soil_Organic_Carbon_kg_m2, input_to_metlitter)
+  dplyr::select(SSN_row_ID, Set, forc_st, forc_sw, forc_npp, LN, param_claysilt, LigFrac, Soil_Organic_Carbon_kg_m2, input_to_metlitter)
 
 #define observed SOC as a dataframe
 SOC_obs <- forcing_data_Century %>% select(Soil_Organic_Carbon_kg_m2, SSN_row_ID)
@@ -72,8 +72,8 @@ inputs <- inputsTrain
 
 #Parameters to fit
 ```{r}
-parToFit.pools <- c(k_active = parameters$k_active, k_slow = parameters$k_slow, k_passive = parameters$k_passive)
-#, t1 = parameters$t1, t2 = parameters$t2, t3 = parameters$t3, t4 = parameters$t4
+parToFit.pools <- unlist(parameters)
+  #c(k_active = parameters$k_active, k_slow = parameters$k_slow, k_passive = parameters$k_passive, t1 = parameters$t1, t2 = parameters$t2, t3 = parameters$t3, t4 = parameters$t4)
 
 parToFit.lower <- parToFit.pools*0.5
 
@@ -146,7 +146,7 @@ write.csv(as.data.frame(unlist(list(FitPars = Fit.pools$par, RMSE_kg = RMSE_kg,A
 start_time = Sys.time()
 
 parameters[names(parToFit.pools)] <- Fit.pools$par
-optim.pools <- Solve_Model_for_Fit(forcing_data_Millennial, parameters)
+optim.pools <- Solve_Model_for_Fit(forcing_data_Century, parameters)
 
 end_time = Sys.time()
 optim.time <- end_time - start_time
@@ -154,7 +154,7 @@ optim.time <- end_time - start_time
 ymax_plot <- ceiling(max(max(SOC_obs$Soil_Organic_Carbon_kg_m2, na.rm=T), max(optim.pools$Soil_Organic_Carbon_kg_m2, na.rm=T)))
 ymax_plot <- ifelse(ymax_plot>100, 20, ymax_plot)
 
-#pdf(file="fit_Millennial_AfSIS.pdf", height=4, width=4)
+#pdf(file="fit_Century_AfSIS.pdf", height=4, width=4)
 par(mfrow = c(1,1))
 par(mar = c(3.5,3.7,0,0)+.9)
 par(oma = c(0,0,0,0))

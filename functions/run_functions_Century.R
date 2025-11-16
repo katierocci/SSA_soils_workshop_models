@@ -37,7 +37,7 @@ Solve_Model_for_Row <- function(row, parameters, state = c(StrLitter=1, MetLitte
   # Override default site-specific value with values from AfSIS
   parameters$input_to_metlitter <- as.numeric(row$input_to_metlitter)
   parameters$param_claysilt <- as.numeric(row$param_claysilt)
-  parameters$LigFrac <- as.numeric(row$Ls)
+  parameters$LigFrac <- as.numeric(row$LigFrac)
   
   derivs_SS_wrapper <- function(step.num, state, parameters, forc_st, forc_sw, forc_npp) {
     
@@ -82,6 +82,7 @@ Solve_Model_for_Fit <- function(inputdata, parameters) {
   
   modeled_pools_list <- lapply(row_list, function(row) {
     model_out <- Solve_Model_for_Row(row, parameters)
+    #print(paste("model_out:", model_out))
   })
   
   modeled.pools <- do.call(rbind, modeled_pools_list)
