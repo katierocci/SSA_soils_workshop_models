@@ -1,8 +1,8 @@
 ---
-title: "Fit_Millennial.Rmd"
+title: "Fit_Century.Rmd"
 output: html_document
 date: "2025-07-22"
-authors: "R Abramoff and Katie Rocci"
+authors: "R Abramoff with contributions from K Rocci and S Von Fromm"
 ---
 
 #Load libraries, data, model files
@@ -15,38 +15,40 @@ library(dplyr)
 library(tidyr)
 
 ##load forcing data
-forcing_data <- read.csv("forcing_data/afsis_ref_updated9.csv", as.is=T)
+afsis_data <- read.csv("forcing_data/afsis_ref_updated9.csv", as.is=T)
 
-forcing_data_Millennial <- forcing_data %>% 
+## Prepare forcing data
+forcing_data <- afsis_data %>% 
+  tibble::rowid_to_column("Set") %>% 
+  filter(Depth == 'Topsoil') %>% 
+  filter(CORG <= 20)
+
+# Forcing data Century
+# https://search.r-project.org/CRAN/refmans/SoilR/html/CenturyModel.html
+
+forcing_data_Century <- forcing_data %>%
                                    drop_na(Litterfall.gC.m2.yr, NPP.gC.m2.d, Clay_2um, Clay_63um, SoilTMP_C, SoilMoi_m3m3, pH, bd_extracted, LIG_N) %>%
-  mutate(npp_modis_gC.m2.yr = npp_modis*1000,
-         SSN_row_ID = row_number()) %>% 
-  mutate(forc_npp = npp_modis_gC.m2.yr/365) %>% 
-                                   dplyr::select(param_pH = pH,
-                                   param_bulkd = bd_extracted, 
-                                   param_claysilt = Clay_63um, 
-                                   forc_st = stemp, 
-                                   forc_sw = sm, 
-                                   forc_npp,
-                                   Latitude,
-                                   Longitude,
-                                   Depth,
-                                   SSN = SSN,
-                                   SSN_row_ID,
-                                   CORG) %>% 
-                            mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*param_bulkd*20/100) %>%
-                            mutate(param_bulkd = param_bulkd*1000*0.2)  %>% #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
-                                  filter(Depth == "Topsoil", CORG <= 20)
+  mutate(npp_modis.gC.m2.d = npp_modis*1000/365, #Century units now same as Millennial
+         SSN_row_ID = row_number(),
+         param_claysilt = Clay_63um,
+         forc_st = stemp, 
+         forc_sw = sm, 
+         forc_npp = npp_modis.gC.m2.d,
+         LN = LIG_N, 
+         Ls = LIG/100,
+         Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
+         input_to_metlitter = 0.85 - 0.013 * LN) %>% #percent in AfSIS to fraction in Century
+  dplyr::select(SSN_row_ID, Set, forc_st, forc_sw, forc_npp, LN, param_claysilt, Ls, Soil_Organic_Carbon_kg_m2, input_to_metlitter)
 
 #define observed SOC as a dataframe
-SOC_obs <- forcing_data_Millennial %>% select(Soil_Organic_Carbon_kg_m2, SSN_row_ID)
+SOC_obs <- forcing_data_Century %>% select(Soil_Organic_Carbon_kg_m2, SSN_row_ID)
 
-#load millennial model components
-source(here("functions/run_functions.R")) #R script that contains calls to run model
-source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
+#load century model components
+source(here("functions/run_functions_Century.R")) #R script that contains calls to run model
+source(here("ODEs/derivs_Century.R")) #Century ODEs
 
 #load default parameters - Described in Table A1 of Abramoff et al. (2021)
-parameters.file <- read.table(here("parameters/soilpara_in_fit_with_qmax.txt"))
+parameters.file <- read.table(here("parameters/soilpara_in_century.txt"))
 parameters <- as.list(parameters.file$V2)
 names(parameters) <- parameters.file$V1
 ```
@@ -61,8 +63,8 @@ trainIndex <- createDataPartition(SOC_obs$Soil_Organic_Carbon_kg_m2, p = proptra
 obsTrain <- SOC_obs[trainIndex,]
 obsTest <- SOC_obs[-trainIndex,]  
 
-inputsTrain <- forcing_data_Millennial[trainIndex,]
-inputsTest <- forcing_data_Millennial[-trainIndex,]
+inputsTrain <- forcing_data_Century[trainIndex,]
+inputsTest <- forcing_data_Century[-trainIndex,]
 
 Obs.pools <- obsTrain
 inputs <- inputsTrain
@@ -70,7 +72,8 @@ inputs <- inputsTrain
 
 #Parameters to fit
 ```{r}
-parToFit.pools <- c(eact_pl = parameters$eact_pl, alpha_pl = parameters$alpha_pl, tae_ref = parameters$tae_ref)
+parToFit.pools <- c(k_active = parameters$k_active, k_slow = parameters$k_slow, k_passive = parameters$k_passive)
+#, t1 = parameters$t1, t2 = parameters$t2, t3 = parameters$t3, t4 = parameters$t4
 
 parToFit.lower <- parToFit.pools*0.5
 
@@ -114,7 +117,7 @@ fit.time
 # Save the best parameters as a table
 outtab <- cbind(Fit.pools$par, parToFit.lower, parToFit.pools, parToFit.upper)
 colnames(outtab) <- c("FitPars","Lower","Default","Upper")
-write.csv(outtab, file= here("parameter_fit_SSA.csv"))
+write.csv(outtab, file= here("parameter_fit_SSA_Century.csv"))
 ```
 
 #Cross-validation on testing set
@@ -134,7 +137,7 @@ AIC <- dim.SOM * log(sum((obsTest$Soil_Organic_Carbon_kg_m2- optim.test[1:dim.SO
 MBE_SOM <- mean(SOM.bias, na.rm=T)
 MAE_SOM <- mean(abs(SOM.bias), na.rm=T)
 print(list(RMSE_kg = RMSE_kg,AIC = AIC, MAE_SOM = MAE_SOM, MBE_SOM = MBE_SOM, fit.SOM= fit.SOM))
-write.csv(as.data.frame(unlist(list(FitPars = Fit.pools$par, RMSE_kg = RMSE_kg,AIC = AIC, MAE_SOM = MAE_SOM, MBE_SOM = MBE_SOM, df1= fit.SOM$fstatistic[2], df2= fit.SOM$fstatistic[3], Fstat=fit.SOM$fstatistic[1], adjR2=fit.SOM$adj.r.squared))), file=paste0("ParFitResult_",Sys.time(),".csv"))
+write.csv(as.data.frame(unlist(list(FitPars = Fit.pools$par, RMSE_kg = RMSE_kg,AIC = AIC, MAE_SOM = MAE_SOM, MBE_SOM = MBE_SOM, df1= fit.SOM$fstatistic[2], df2= fit.SOM$fstatistic[3], Fstat=fit.SOM$fstatistic[1], adjR2=fit.SOM$adj.r.squared))), file=paste0("ParFitResult_",Sys.time(),"_Century.csv"))
 ```
 
 #Run Best Parameters
