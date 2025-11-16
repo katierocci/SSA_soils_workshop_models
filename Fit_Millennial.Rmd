@@ -114,7 +114,7 @@ fit.time
 # Save the best parameters as a table
 outtab <- cbind(Fit.pools$par, parToFit.lower, parToFit.pools, parToFit.upper)
 colnames(outtab) <- c("FitPars","Lower","Default","Upper")
-write.csv(outtab, file= here("parameter_fit_SSA.csv"))
+write.csv(outtab, file= here("parameter_fit_SSA_update.csv"))
 ```
 
 #Cross-validation on testing set

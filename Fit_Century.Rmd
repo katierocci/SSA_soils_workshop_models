@@ -37,7 +37,7 @@ forcing_data_Century <- forcing_data %>%
          LN = LIG_N, 
          Ls = LIG/100,
          Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
-         input_to_metlitter = 0.85 - 0.013 * LN) %>% #percent in AfSIS to fraction in Century
+         input_to_metlitter = 0.85 - 0.013 * LN) %>%
   dplyr::select(SSN_row_ID, Set, forc_st, forc_sw, forc_npp, LN, param_claysilt, Ls, Soil_Organic_Carbon_kg_m2, input_to_metlitter)
 
 #define observed SOC as a dataframe
