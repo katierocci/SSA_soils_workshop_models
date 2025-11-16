@@ -72,12 +72,13 @@ inputs <- inputsTrain
 
 #Parameters to fit
 ```{r}
-parToFit.pools <- unlist(parameters)
+parToFit.pools <- c(k_active = parameters$k_active, k_slow = parameters$k_slow, k_passive = parameters$k_passive)
+  #unlist(parameters)
   #c(k_active = parameters$k_active, k_slow = parameters$k_slow, k_passive = parameters$k_passive, t1 = parameters$t1, t2 = parameters$t2, t3 = parameters$t3, t4 = parameters$t4)
 
-parToFit.lower <- parToFit.pools*0.5
+parToFit.lower <- parToFit.pools*0.1
 
-parToFit.upper <- parToFit.pools*1.5
+parToFit.upper <- parToFit.pools*10 #1.5
 ```
 
 #Define cost function
