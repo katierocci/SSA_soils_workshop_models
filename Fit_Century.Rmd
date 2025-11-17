@@ -86,7 +86,7 @@ parToFit.upper <- parToFit.pools*10 #1.5
 # Definition of the cost function
 Objective.pools <- function(x, parset = names(x)) {
   parameters[parset] <- x
-  out <- Solve_Model_for_Fit(inputsTrain, parameters)
+  out <- Solve_Model_for_Fit_Century(inputsTrain, parameters)
   modCost(out, Obs.pools, x="SSN_row_ID", weight = "none")
 }
 ```
@@ -126,7 +126,7 @@ write.csv(outtab, file= here("parameter_fit_SSA_Century.csv"))
 #Get best parameters
 parameters[names(parToFit.pools)] <- Fit.pools$par
 #Calculate model pools at testing sites
-optim.test <- Solve_Model_for_Fit(inputsTest, parameters)
+optim.test <- Solve_Model_for_Fit_Century(inputsTest, parameters)
 
 #Calculate model performance indices
 ##Bias is modeled - observed
@@ -147,7 +147,7 @@ write.csv(as.data.frame(unlist(list(FitPars = Fit.pools$par, RMSE_kg = RMSE_kg,A
 start_time = Sys.time()
 
 parameters[names(parToFit.pools)] <- Fit.pools$par
-optim.pools <- Solve_Model_for_Fit(forcing_data_Century, parameters)
+optim.pools <- Solve_Model_for_Fit_Century(forcing_data_Century, parameters)
 
 end_time = Sys.time()
 optim.time <- end_time - start_time

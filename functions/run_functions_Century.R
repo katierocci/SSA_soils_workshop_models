@@ -8,7 +8,7 @@
 ##3 parameters
 ##4 whether or not to calculate the eigenvalues (optional; default = 0; 0 = no, 1 = yes)
 ##5 initial states of pools (optional; default = 1 for all pools and 0 for CO2 flux)
-Solve_Model  <- function(inputdata,derivs,parameters,state=c(StrLitter=1, MetLitter=1, ACTIVE=1, SLOW=1, PASSIVE=1)) {
+Solve_Model_Century  <- function(inputdata,derivs,parameters,state=c(StrLitter=1, MetLitter=1, ACTIVE=1, SLOW=1, PASSIVE=1)) {
 
     SStime = 1000*365 #time at which steady state solution is evaluated
 
@@ -27,7 +27,7 @@ Solve_Model  <- function(inputdata,derivs,parameters,state=c(StrLitter=1, MetLit
     return(SS_output)
 }
 
-Solve_Model_for_Row <- function(row, parameters, state = c(StrLitter=1, MetLitter=1, ACTIVE=1, SLOW=1, PASSIVE=1)) {
+Solve_Model_for_Row_Century <- function(row, parameters, state = c(StrLitter=1, MetLitter=1, ACTIVE=1, SLOW=1, PASSIVE=1)) {
   SStime <- 1000 * 365
   
   forc_st <- approxfun(1:SStime, rep(row$forc_st, SStime))
@@ -77,11 +77,11 @@ Solve_Model_for_Row <- function(row, parameters, state = c(StrLitter=1, MetLitte
   return(modeled)
 }
 
-Solve_Model_for_Fit <- function(inputdata, parameters) {
+Solve_Model_for_Fit_Century <- function(inputdata, parameters) {
   row_list <- split(inputdata, seq_len(nrow(inputdata)))
   
   modeled_pools_list <- lapply(row_list, function(row) {
-    model_out <- Solve_Model_for_Row(row, parameters)
+    model_out <- Solve_Model_for_Row_Century(row, parameters)
     #print(paste("model_out:", model_out))
   })
   
