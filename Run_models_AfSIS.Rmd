@@ -30,7 +30,8 @@ source(here("functions/run_functions.R")) #R script that contains calls to run m
 source(here("ODEs/derivs_V2_MM.R")) #The official version of Millennial V2
 
 #load century model components
-source(here("CenturyFunction/CenturyFunction_mod.R"))
+source(here("functions/run_functions_Century.R")) #R script that contains calls to run model
+source(here("ODEs/derivs_Century.R")) #Century ODEs
 ```
 
 #Load forcing data
@@ -76,110 +77,59 @@ forcing_data_Millennial <- forcing_data %>%
 # Forcing data Century
 # https://search.r-project.org/CRAN/refmans/SoilR/html/CenturyModel.html
 
-forcing_data_Century <- forcing_data %>% 
-  mutate(npp_modis.gC.m2.week = npp_modis*1000/52, #Century units are mass/area/week
-         silt = (Clay_63um - Clay_2um)/100,  #AfSIS % to fraction in Century
-         clay = Clay_2um/100,  #AfSIS % to fraction in Century
-         surfaceIn = npp_modis.gC.m2.week/2, #Assume 50/50 split
-         soilIn = npp_modis.gC.m2.week/2,
+forcing_data_Century <- forcing_data %>%
+  drop_na(Litterfall.gC.m2.yr, NPP.gC.m2.d, Clay_2um, Clay_63um, stemp, 
+          sm, pH, bd_extracted, LIG_N) %>%
+  mutate(npp_modis.gC.m2.d = npp_modis*1000/365, #Century units now same as Millennial
+         SSN_row_ID = row_number(),
+         param_claysilt = Clay_63um/100, #fraction in Century
+         forc_st = stemp, 
+         forc_sw = sm, 
+         forc_npp = npp_modis.gC.m2.d,
          LN = LIG_N, 
-         Ls = LIG/100) %>% #percent in AfSIS to fraction in Century
-  drop_na(npp_modis.gC.m2.week, pH, Clay_2um, LN, stemp, sm, Clay_63um, bd_extracted) %>%
-  dplyr::select(SSN, Set, PET, MAP, MAT, LN, clay, silt, Ls, surfaceIn, soilIn, Depth)
+         LigFrac = LIG/100,
+         Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
+         input_to_metlitter = 0.85 - 0.013 * LN) %>%
+  dplyr::select(SSN_row_ID, SSN, Set, forc_st, forc_sw, forc_npp, LN, param_claysilt, 
+                LigFrac, Soil_Organic_Carbon_kg_m2, input_to_metlitter)
+
 ```
 
-#Run Century at AfSIS sites - default
+#Run Century at AfSIS sites (after Abramoff et al. 2021)
 ```{r}
-#run for 1000 years
-time = seq(0,52*1000)
+# Read in parameters - Described in Table A1 of Abramoff et al. (2021)
+parameters.file <- read.table(here("parameters/soilpara_in_century.txt")) #default
+# parameters.file <- read.table(here("parameters/parameter_fit_SSA_Century.csv")) #fitted
+parameters <- as.list(parameters.file$V2)
+names(parameters) <- parameters.file$V1
 
-results <- lapply(seq_len(nrow(forcing_data_Century)), function(i) {
-  row <- forcing_data_Century[i, ]
 
-# --- Step 1: Compute environmental modifiers ---
-  # Use default century temperature and moisture modifiers
-  fT <- fT.Century1(row$MAT)       # Air temperature in degrees C
-  fW <- fW.Century(row$MAP/12, row$PET/12) # PPT monthly precip, PET = monthly PET, both in mm
-  xi_val <- fT * fW                   # combine multiplicatively
+# Function to run model for one row of site parameters
+run_century_for_site <- function(site_row, base_params){
+  
+}
 
-  # If your t (time) is a time vector, make xi a data frame with constant values
-  xi_df <- data.frame(time = time, xi = rep(xi_val, length(mnths)))
 
-  # --- Step 2: Run the Century model ---
-  cm <- CenturyModel_mod(
-    t = time,
-    surfaceIn = row$surfaceIn,
-    soilIn = row$soilIn,
-    LN = row$LN,
-    Ls = row$Ls,
-    clay = row$clay,
-    silt = row$silt,
-    xi = xi_df       # include environmental forcing here
-  )
-
-  # --- Step 3: Extract last carbon pool values ---
-  Ct <- getC(cm)
-  last_row <- Ct[nrow(Ct), , drop = FALSE]
-
-  return(last_row)
+# Apply model across all rows of the site parameter dataframe
+results_list <- apply(forcing_data_Century, 1, function(row) {
+  row <- as.list(row)  # Convert row to list for easy referencing
+  run_century_for_site(row, parameters)
 })
 
-
-final_results <- do.call(rbind, results)
-
-
-poolNames <- c("SurfaceStructural", "SurfaceMetabolic", "BelowgroundStructural",
-               "BelowgroundMetabolic", "ActiveSOM", "SlowSOM", "PassiveSOM")
-
-final_results <- as.data.frame(final_results)
-
-names(final_results) <- poolNames
+# Combine all into one dataframe
+Century_ss <- dplyr::bind_rows(results_list)
+Century_ss$site_id <- as.integer(Century_ss$site_id)
 
 #Merge model results with original site parameters; only consider the three main pools
-CENTURY_ss_AllSites <- as.data.frame(cbind(forcing_data_Century, final_results)) %>% 
+Century_ss_AllSites <- as.data.frame(cbind(forcing_data_Century, final_results)) %>% 
   mutate(Soil_Organic_Carbon_kg_m2 = (ActiveSOM + SlowSOM + PassiveSOM) / 1000, 
          Type = "Century")
 
 # write.csv(CENTURY_ss_AllSites, "./model_output/Century_results.csv")
 
 # View final result
-hist(CENTURY_ss_AllSites$Soil_Organic_Carbon_kg_m2)
+hist(Century_ss_AllSites$Soil_Organic_Carbon_kg_m2)
 
-```
-
-#Century without temp and PPT
-```{r}
-
-# results <- lapply(seq_len(nrow(forcing_data_Century)), function(i) {
-#   row <- forcing_data_Century[i, ]
-# 
-#   cm <- CenturyModel(
-#     t = mnths,
-#     surfaceIn = row$surfaceIn,
-#     soilIn = row$soilIn,
-#     LN = 0.5,
-#     Ls = 0.1,
-#     clay = row$clay,
-#     silt = row$silt
-#   )
-# 
-#   Ct <- getC(cm)
-# 
-#   # Keep only the last row of the matrix
-#   last_row <- Ct[nrow(Ct), , drop = FALSE]
-# 
-#   return(last_row)
-# })
-# 
-# final_results <- do.call(rbind, results)
-# poolNames=c("Surface structural", "Surface metabolic", "Belowground structural",
-#                "Belowground metabolic", "Active SOM", "Slow SOM", "Passive SOM")
-# final_results <- as.data.frame(final_results)
-# names(final_results) <- poolNames
-# 
-# CENTURY_ss_AllSites <- as.data.frame(cbind(forcing_data_Century,final_results))
-# 
-# write.csv(CENTURY_ss_AllSites, "./model_output/Century_results_without_scalars.csv")
 ```
 
 
@@ -236,8 +186,8 @@ ggplot(MIMICS_ss_AllSites) +
 #Run Millennial at AfSIS sites
 ```{r}
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
-# parameters.file <- read.table(here("parameters/soilpara_in_fit.txt")) #default
-parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA.txt")) #fitted
+parameters.file <- read.table(here("parameters/soilpara_in_fit.txt")) #default
+# parameters.file <- read.table(here("parameters/parameter_fit_SSA_update.csv")) #fitted
 parameters <- as.list(parameters.file$V2)
 names(parameters) <- parameters.file$V1
 
@@ -296,37 +246,43 @@ hist(Millennial_ss_AllSites$Soil_Organic_Carbon_kg_m2)
 # Combine output
 ```{r}
 # Default Runs
-# both_models <- rbind(MIMICS_ss_AllSites %>%
+all_models_default <- rbind(MIMICS_ss_AllSites %>%
+                              dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+                            Millennial_ss_AllSites %>%
+                              dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+                            Century_ss_AllSites %>%
+                              dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+                            forcing_data %>%
+                              mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
+                                     Type = "Observed") %>%
+                              select(SSN, Soil_Organic_Carbon_kg_m2, Type))
+
+write.csv(all_models_default, row.names = FALSE,
+          paste0("./model_output/all_model_results_default_run_",
+          Sys.Date(), ".csv"))
+
+ggplot(all_models_default, aes(x = Soil_Organic_Carbon_kg_m2)) + 
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") + 
+  facet_wrap(~ Type, ncol = 1)
+
+# Fitted Runs
+# all_models_fitted <- rbind(MIMICS_ss_AllSites %>%
 #                        dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
 #                      Millennial_ss_AllSites %>%
 #                        dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-#                      CENTURY_ss_AllSites %>% 
-#                        dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+#                      Century_ss_AllSites %>%
+#                               dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
 #                      forcing_data %>%
 #                        mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
 #                               Type = "Observed") %>%
 #                        select(SSN, Soil_Organic_Carbon_kg_m2, Type))
-# 
-# write.csv(both_models, row.names = FALSE,
-#           paste0("./model_output/both_model_results_default_run_",
+# write.csv(all_models_fitted, row.names = FALSE,
+#           paste0("./model_output/all_model_results_fitted_run_",
 #           Sys.Date(), ".csv"))
-
-# Fitted Runs
-both_models <- rbind(MIMICS_ss_AllSites %>%
-                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-                     Millennial_ss_AllSites %>%
-                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-                     forcing_data %>%
-                       mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
-                              Type = "Observed") %>%
-                       select(SSN, Soil_Organic_Carbon_kg_m2, Type))
-write.csv(both_models, row.names = FALSE,
-          paste0("./model_output/both_model_results_fitted_run_",
-          Sys.Date(), ".csv"))
-
-ggplot(both_models, aes(x = Soil_Organic_Carbon_kg_m2)) + 
-  geom_histogram(bins = 30, fill = "steelblue", color = "white") + 
-  facet_wrap(~ Type, ncol = 1)
+# 
+# ggplot(all_models_fitted, aes(x = Soil_Organic_Carbon_kg_m2)) + 
+#   geom_histogram(bins = 30, fill = "steelblue", color = "white") + 
+#   facet_wrap(~ Type, ncol = 1)
 
 ```
 
