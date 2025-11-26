@@ -398,8 +398,16 @@ walk_plot <- grid.arrange(pRMSE, pr2, pTau_x, pCUE_x, pDesorb_x, pFPHYS_x, pVslo
 MCMC_out_improved <- MCMC_out%>%filter(improve == 1) %>%mutate(cost = (RMSE/100)-r2)
 hist(MCMC_out_improved$RMSE)
 hist(MCMC_out_improved$r2)
-MCMC_SingleBest <- MCMC_out %>% filter(iter==37 & i==13)
-write.csv(MCMC_SingleBest, "parameters/Century_MCMC_out_SingleBest_112525.csv")
+MCMC_SingleBest <- MCMC_out %>% filter(iter==5 & i==1)
+write.csv(MCMC_SingleBest, "parameters/Century_MCMC_out_SingleBest_112625.csv")
+
+
+#filtering later
+MCMC_out <- read.csv("Century_MCMC_out_112525.csv")
+MCMC_out_filt3 <- MCMC_out %>% filter(w1_x>0.5, w1_x<2,w2_x>0.5, w2_x<2,t3_x>0.5, t3_x<2,t4_x>0.5, t4_x<2,k_active_x>0.5, k_active_x<2,k_slow_x>0.5, k_slow_x<2,k_passive_x>0.5, k_passive_x<2,
+                                      metlitter_to_active_x>0.5, metlitter_to_active_x<2,strlitter_to_active_x>0.5, strlitter_to_active_x<2, strlitter_to_slow_x>0.5, strlitter_to_slow_x<2) 
+MCMC_SingleBest2 <- MCMC_out %>% filter(iter==5 & i==1)
+write.csv(MCMC_SingleBest2, "parameters/Century_MCMC_out_SingleBest2_112625.csv")
 
 #save plot
 ggsave(file=paste0("MCMC/Output/", format(Sys.time(), "%Y%m%d_%H%M%S_"), "MIM_MCMC_pCombos-", as.character(MIM_runs),"_walk_plot", ".jpeg"), 
@@ -409,7 +417,7 @@ ggsave(file=paste0("MCMC/Output/", format(Sys.time(), "%Y%m%d_%H%M%S_"), "MIM_MC
 
 
 ##################################
-#try parameters in test dataset and with full dataset
+#try parameters in test dataset and with full dataset - still MIMICS, fix!
 #################################
 #default pset - before running, re-load source data to get orginal paramters back!
 MIMICS_afsis_test <- dataTest %>% split(1:nrow(dataTest)) %>% map(~ MIMICS_SP(df=.)) %>% bind_rows()

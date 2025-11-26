@@ -102,7 +102,8 @@ forcing_data_Century <- forcing_data %>%
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
 parameters.file <- read.table(here("parameters/soilpara_in_century.txt")) #default
 #parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA_Century.txt")) #fitted
-parameters.MCMC <- read.csv("parameters/Century_MCMC_out_SingleBest_112525.csv") #MCMC fitted
+#uncomment next two code chunks for fitted
+parameters.MCMC <- read.csv("parameters/Century_MCMC_out_SingleBest_112625.csv") #MCMC fitted
 parameters.file <- parameters.file %>% mutate(V2 = case_when(
     V1 == "w1" ~ V2*parameters.MCMC$w1_x,
     V1 == "w2" ~ V2*parameters.MCMC$w2_x,
@@ -125,6 +126,7 @@ names(parameters) <- parameters.file$V1
 run_model_for_site <- function(site_row, base_params) {
   # Copy full parameter list
   site_params <- as.list(base_params)
+  #print(paste("k_active being used:", site_params$k_active))
   # Override default site-specific value with values from AfSIS
   site_params$input_to_metlitter <- as.numeric(site_row$input_to_metlitter)
   site_params$param_claysilt <- as.numeric(site_row$param_claysilt)
@@ -156,6 +158,7 @@ input_for_site <- data.frame(
 # Apply model across all rows of the site parameter dataframe
 results_list <- apply(forcing_data_Century, 1, function(row) {
   row <- as.list(row)  # Convert row to list for easy referencing
+  #print(parameters$k_active)
   run_model_for_site(row, parameters)
 })
 
@@ -166,7 +169,7 @@ Century_ss$site_id <- as.integer(Century_ss$site_id)
 # Merge model outputs with original site parameters if needed
 Century_ss_AllSites <- forcing_data_Century %>%
   left_join(Century_ss, by = "site_id") %>%
-  mutate(Soil_Organic_Carbon_kg_m2 = (StrLitter + MetLitter + ACTIVE + SLOW + PASSIVE) / 1000, 
+  mutate(Soil_Organic_Carbon_kg_m2 = (ACTIVE + SLOW + PASSIVE) / 1000, #StrLitter + MetLitter + 
          Type = "Century")
 
 # View final result
@@ -228,7 +231,7 @@ ggplot(MIMICS_ss_AllSites) +
 #Run Millennial at AfSIS sites
 ```{r}
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
-# parameters.file <- read.table(here("parameters/soilpara_in_fit_with_qmax.txt")) #default
+#parameters.file <- read.table(here("parameters/soilpara_in_fit_with_qmax.txt")) #default
 parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA_Millennial.txt")) #fitted
 parameters <- as.list(parameters.file$V2)
 names(parameters) <- parameters.file$V1
@@ -304,8 +307,8 @@ hist(Millennial_ss_AllSites$Soil_Organic_Carbon_kg_m2)
 #           paste0("./model_output/all_model_results_default_run_",
 #           Sys.Date(), ".csv"))
 # 
-# ggplot(all_models_default, aes(x = Soil_Organic_Carbon_kg_m2)) + 
-#   geom_histogram(bins = 30, fill = "steelblue", color = "white") + 
+# ggplot(all_models_default, aes(x = Soil_Organic_Carbon_kg_m2)) +
+#   geom_histogram(bins = 30, fill = "steelblue", color = "white") +
 #   facet_wrap(~ Type, ncol = 1)
 
 # Fitted Runs
