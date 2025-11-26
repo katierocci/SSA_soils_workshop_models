@@ -101,9 +101,9 @@ forcing_data_Century <- forcing_data %>%
 ```{r}
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
 parameters.file <- read.table(here("parameters/soilpara_in_century.txt")) #default
-#parameters.file <- read.table(here("parameters/parameter_fit_SSA_Century.csv")) #fitted
+#parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA_Century.txt")) #fitted
 parameters.MCMC <- read.csv("parameters/Century_MCMC_out_SingleBest_112525.csv") #MCMC fitted
-parameters.file.test <- parameters.file %>% mutate(V2 = case_when(
+parameters.file <- parameters.file %>% mutate(V2 = case_when(
     V1 == "w1" ~ V2*parameters.MCMC$w1_x,
     V1 == "w2" ~ V2*parameters.MCMC$w2_x,
     V1 == "t3" ~ V2*parameters.MCMC$t3_x,
@@ -166,7 +166,8 @@ Century_ss$site_id <- as.integer(Century_ss$site_id)
 # Merge model outputs with original site parameters if needed
 Century_ss_AllSites <- forcing_data_Century %>%
   left_join(Century_ss, by = "site_id") %>%
-  mutate(Soil_Organic_Carbon_kg_m2 = (StrLitter + MetLitter + ACTIVE + SLOW + PASSIVE) / 1000, Type = "Century")
+  mutate(Soil_Organic_Carbon_kg_m2 = (StrLitter + MetLitter + ACTIVE + SLOW + PASSIVE) / 1000, 
+         Type = "Century")
 
 # View final result
 hist(Century_ss_AllSites$Soil_Organic_Carbon_kg_m2)
@@ -227,8 +228,8 @@ ggplot(MIMICS_ss_AllSites) +
 #Run Millennial at AfSIS sites
 ```{r}
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
-# parameters.file <- read.table(here("parameters/soilpara_in_fit.txt")) #default
-parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA.txt")) #fitted
+# parameters.file <- read.table(here("parameters/soilpara_in_fit_with_qmax.txt")) #default
+parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA_Millennial.txt")) #fitted
 parameters <- as.list(parameters.file$V2)
 names(parameters) <- parameters.file$V1
 
@@ -278,7 +279,8 @@ Millennial_ss$site_id <- as.integer(Millennial_ss$site_id)
 # Merge model outputs with original site parameters if needed
 Millennial_ss_AllSites <- forcing_data_Millennial %>%
   left_join(Millennial_ss, by = "site_id") %>%
-  mutate(Soil_Organic_Carbon_kg_m2 = (POM + LMWC + AGG + MIC + MAOM) / 1000, Type = "Millennial")
+  mutate(Soil_Organic_Carbon_kg_m2 = (POM + LMWC + AGG + MIC + MAOM) / 1000, 
+         Type = "Millennial")
 
 # View final result
 hist(Millennial_ss_AllSites$Soil_Organic_Carbon_kg_m2)

@@ -399,7 +399,7 @@ MCMC_out_improved <- MCMC_out%>%filter(improve == 1) %>%mutate(cost = (RMSE/100)
 hist(MCMC_out_improved$RMSE)
 hist(MCMC_out_improved$r2)
 MCMC_SingleBest <- MCMC_out %>% filter(iter==37 & i==13)
-write.csv(MCMC_out, "parameters/Century_MCMC_out_SingleBest_112525.csv")
+write.csv(MCMC_SingleBest, "parameters/Century_MCMC_out_SingleBest_112525.csv")
 
 #save plot
 ggsave(file=paste0("MCMC/Output/", format(Sys.time(), "%Y%m%d_%H%M%S_"), "MIM_MCMC_pCombos-", as.character(MIM_runs),"_walk_plot", ".jpeg"), 

@@ -1,0 +1,12 @@
+"","unlist(list(FitPars = Fit.pools$par, RMSE_kg = RMSE_kg, AIC = AIC, MAE_SOM = MAE_SOM, MBE_SOM = MBE_SOM, df1 = fit.SOM$fstatistic[2], df2 = fit.SOM$fstatistic[3], Fstat = fit.SOM$fstatistic[1], adjR2 = fit.SOM$adj.r.squared))"
+"FitPars.eact_pl",65373.0524825042
+"FitPars.alpha_pl",1028022698600.14
+"FitPars.tae_ref",19.6213137861048
+"RMSE_kg",3.96679226575982
+"AIC",423.655079023016
+"MAE_SOM",3.264536378452
+"MBE_SOM",1.45756038549148
+"df1.numdf",1
+"df2.dendf",151
+"Fstat.value",29.4161239259362
+"adjR2",0.157503239220467

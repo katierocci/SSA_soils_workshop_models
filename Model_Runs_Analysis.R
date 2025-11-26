@@ -6,9 +6,9 @@ library(tidyverse)
 library(ggpubr)
 
 ## Load default and fitted model runs
-default_run <- read.csv("model_output/both_model_results_default_run_2025-11-10.csv") %>% 
+default_run <- read.csv("model_output/all_model_results_default_run_2025-11-17.csv") %>% 
   mutate(ModelRun = "default") 
-fitted_run <- read.csv("model_output/both_model_results_fitted_run_2025-11-10.csv") %>% 
+fitted_run <- read.csv("model_output/all_model_results_fitted_run_2025-11-18.csv") %>% 
   mutate(ModelRun = "fitted")
 
 ## Load AfSIS data
@@ -111,8 +111,7 @@ afsis_red <- afsis_data %>%
   filter(CORG <= 20) %>% 
   dplyr::select(SSN, Longitude, Latitude, Region, Country, Site, Cluster, Plot,
                 Clay_2um, Clay_63um, pH, Am_Ox_Al, Am_Ox_Fe, Caex, Clay_1_1,
-                Clay_2_1, LIG_N, bd_extracted, npp_modis, sm, stemp, MAT, PET,
-                MAP, LIG)
+                Clay_2_1, LIG_N, bd_extracted, npp_modis, sm, stemp, LIG)
 
 model_afsis <- both_runs_obs %>% 
   left_join(afsis_red, by = "SSN") %>% 
@@ -134,47 +133,25 @@ bias_plot_fun_forc_prop <- function(xvar, model){
 }
 
 # Century 
-f1_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = npp_modis*1000/52) +
-  scale_x_continuous("NPP [gC m-2 w-1]") +
-  scale_color_manual("Model run", values = c("#feb24c")) +
-  scale_fill_manual("Model run", values = c("#feb24c"))
+f1_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = npp_modis*1000/365) +
+  scale_x_continuous("NPP [gC m-2 d-1]") 
 
-f2_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = MAP) +
-  scale_x_continuous("MAP [mm]") +
-  scale_color_manual("Model run", values = c("#feb24c")) +
-  scale_fill_manual("Model run", values = c("#feb24c"))
+f2_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = (Clay_63um)/100) +
+  scale_x_continuous("Clay content < 63 um [%]")
 
-f3_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = PET) +
-  scale_x_continuous("PET [mm]") +
-  scale_color_manual("Model run", values = c("#feb24c")) +
-  scale_fill_manual("Model run", values = c("#feb24c"))
+f3_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = sm) +
+  scale_x_continuous("Soil moisture [m-3 m-3]")
 
-f4_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = MAT) +
-  scale_x_continuous("MAT [C]") +
-  scale_color_manual("Model run", values = c("#feb24c")) +
-  scale_fill_manual("Model run", values = c("#feb24c"))
+f4_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = stemp) +
+  scale_x_continuous("Soil temperature [C]")
 
-f5_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = Clay_2um/100) +
-  scale_x_continuous("Clay content < 2 um") +
-  scale_color_manual("Model run", values = c("#feb24c")) +
-  scale_fill_manual("Model run", values = c("#feb24c"))
+f5_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = LIG/100) +
+  scale_x_continuous("Lignin")
 
-f6_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = (Clay_63um - Clay_2um)/100) +
-  scale_x_continuous("Silt content > 2 um & < 63 um") +
-  scale_color_manual("Model run", values = c("#feb24c")) +
-  scale_fill_manual("Model run", values = c("#feb24c")) 
+f6_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = LIG_N) +
+  scale_x_continuous("Lignin:N ratio")
 
-f7_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = LIG_N/100) +
-  scale_x_continuous("Lignin:N ratio")  +
-  scale_color_manual("Model run", values = c("#feb24c")) +
-  scale_fill_manual("Model run", values = c("#feb24c"))
-
-f8_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = LIG/100) +
-  scale_x_continuous("Lignin")  +
-  scale_color_manual("Model run", values = c("#feb24c")) +
-  scale_fill_manual("Model run", values = c("#feb24c"))
-
-ggarrange(f1_cen, f2_cen, f3_cen, f4_cen, f5_cen, f6_cen, f7_cen, f8_cen,
+ggarrange(f1_cen, f2_cen, f3_cen, f4_cen, f5_cen, f6_cen,
           common.legend = TRUE, nrow = 2, ncol = 4)
 
 ggsave(paste0("./model_output/BiasPlots_Century_Fitted_forc_",
@@ -184,17 +161,17 @@ ggsave(paste0("./model_output/BiasPlots_Century_Fitted_forc_",
 f1_mil <- bias_plot_fun_forc_prop(model = "Millennial", xvar = npp_modis*1000/365) +
   scale_x_continuous("NPP [gC m-2 d-1]")
 
-f2_mil <- bias_plot_fun_forc_prop(model = "Millennial", xvar = pH) +
-  scale_x_continuous("pH")
-
-f3_mil <- bias_plot_fun_forc_prop(model = "Millennial", xvar = Clay_63um) +
+f2_mil <- bias_plot_fun_forc_prop(model = "Millennial", xvar = Clay_63um) +
   scale_x_continuous("Clay content < 63 um [%]")
 
-f4_mil <- bias_plot_fun_forc_prop(model = "Millennial", xvar = sm) +
+f3_mil <- bias_plot_fun_forc_prop(model = "Millennial", xvar = sm) +
   scale_x_continuous("Soil moisture [m-3 m-3]")
 
-f5_mil <- bias_plot_fun_forc_prop(model = "Millennial", xvar = stemp) +
+f4_mil <- bias_plot_fun_forc_prop(model = "Millennial", xvar = stemp) +
   scale_x_continuous("Soil temperature [C]")
+
+f5_mil <- bias_plot_fun_forc_prop(model = "Millennial", xvar = pH) +
+  scale_x_continuous("pH")
 
 ggarrange(f1_mil, f2_mil, f3_mil, f4_mil, f5_mil, common.legend = TRUE)
 
@@ -205,17 +182,17 @@ ggsave(paste0("./model_output/BiasPlots_Millennial_DefaultFitted_forc_",
 f1_mic <- bias_plot_fun_forc_prop(model = "MIMICS", xvar = npp_modis*1000) +
   scale_x_continuous("NPP [gC m-2 yr-1]", expand = c(0,0))
 
-f2_mic <- bias_plot_fun_forc_prop(model = "MIMICS", xvar = LIG_N) +
-  scale_x_continuous("Lignin:N ratio")
-
-f3_mic <- bias_plot_fun_forc_prop(model = "MIMICS", xvar = Clay_2um) +
+f2_mic <- bias_plot_fun_forc_prop(model = "MIMICS", xvar = Clay_2um) +
   scale_x_continuous("Clay content < 2 um [%]", expand = c(0,0))
 
-f4_mic <- bias_plot_fun_forc_prop(model = "MIMICS", xvar = sm) +
+f3_mic <- bias_plot_fun_forc_prop(model = "MIMICS", xvar = sm) +
   scale_x_continuous("Soil moisture [m-3 m-3]", expand = c(0,0))
 
-f5_mic <- bias_plot_fun_forc_prop(model = "MIMICS", xvar = stemp) +
+f4_mic <- bias_plot_fun_forc_prop(model = "MIMICS", xvar = stemp) +
   scale_x_continuous("Soil temperature [C]", expand = c(0,0))
+
+f5_mic <- bias_plot_fun_forc_prop(model = "MIMICS", xvar = LIG_N) +
+  scale_x_continuous("Lignin:N ratio")
 
 ggarrange(f1_mic, f2_mic, f3_mic, f4_mic, f5_mic, common.legend = TRUE)
 

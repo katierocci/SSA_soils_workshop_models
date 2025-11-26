@@ -27,9 +27,10 @@ forcing_data <- afsis_data %>%
 # https://search.r-project.org/CRAN/refmans/SoilR/html/CenturyModel.html
 
 forcing_data_Century <- forcing_data %>%
-                                   drop_na(Litterfall.gC.m2.yr, NPP.gC.m2.d, Clay_2um, Clay_63um, SoilTMP_C, SoilMoi_m3m3, pH, bd_extracted, LIG_N) %>%
+  drop_na(Litterfall.gC.m2.yr, NPP.gC.m2.d, Clay_2um, Clay_63um, stemp, sm, pH, 
+          bd_extracted, LIG_N) %>%
   mutate(npp_modis.gC.m2.d = npp_modis*1000/365, #Century units now same as Millennial
-         SSN_row_ID = row_number(),
+         SSN_row_ID = Set,
          param_claysilt = Clay_63um/100, #fraction in Century
          forc_st = stemp, 
          forc_sw = sm, 
@@ -41,7 +42,8 @@ forcing_data_Century <- forcing_data %>%
   dplyr::select(SSN_row_ID, Set, forc_st, forc_sw, forc_npp, LN, param_claysilt, LigFrac, Soil_Organic_Carbon_kg_m2, input_to_metlitter)
 
 #define observed SOC as a dataframe
-SOC_obs <- forcing_data_Century %>% select(Soil_Organic_Carbon_kg_m2, SSN_row_ID)
+SOC_obs <- forcing_data_Century %>% 
+  dplyr::select(Soil_Organic_Carbon_kg_m2, SSN_row_ID)
 
 #load century model components
 source(here("functions/run_functions_Century.R")) #R script that contains calls to run model
@@ -59,7 +61,8 @@ proptrain = 0.8
 
 #Partitions data into training and test datasets
 set.seed(1)
-trainIndex <- createDataPartition(SOC_obs$Soil_Organic_Carbon_kg_m2, p = proptrain, list = FALSE, times = 1)
+trainIndex <- createDataPartition(SOC_obs$Soil_Organic_Carbon_kg_m2, p = proptrain, 
+                                  list = FALSE, times = 1)
 obsTrain <- SOC_obs[trainIndex,]
 obsTest <- SOC_obs[-trainIndex,]  
 
@@ -92,7 +95,7 @@ parToFit.upper <- c(parToFit.pools[1:5]*4, parToFit.pools[6:11]*1.2)
 Objective.pools <- function(x, parset = names(x)) {
   parameters[parset] <- x
   out <- Solve_Model_for_Fit_Century(inputsTrain, parameters)
-  modCost(out, Obs.pools, x="SSN_row_ID", weight = "none")
+  modCost(out, Obs.pools, x = "SSN_row_ID", weight = "none")
 }
 ```
 
@@ -120,10 +123,20 @@ end_time = Sys.time()
 fit.time <- end_time - start_time
 fit.time
 
-# Save the best parameters as a table
-outtab <- cbind(Fit.pools$par, parToFit.lower, parToFit.pools, parToFit.upper)
-colnames(outtab) <- c("FitPars","Lower","Default","Upper")
-write.csv(outtab, file= here("parameter_fit_SSA_Century.csv"))
+# Save the best parameters as a txt file with all parameters (fitted + unchanged)
+parameters[names(parToFit.pools)] <- Fit.pools$par
+
+output_df <- data.frame(
+  V1 = names(parameters),
+  V2 = unlist(parameters)
+)
+
+write.table(output_df, 
+            file = here("parameters/soilpara_in_fit_SSA_Century.txt"),
+            row.names = FALSE,
+            col.names = FALSE,
+            quote = FALSE,
+            sep = "\t")
 ```
 
 #Cross-validation on testing set
@@ -136,14 +149,30 @@ optim.test <- Solve_Model_for_Fit_Century(inputsTest, parameters)
 #Calculate model performance indices
 ##Bias is modeled - observed
 fit.SOM <- summary(lm(optim.test[1:dim(inputsTest)[1],]$Soil_Organic_Carbon_kg_m2 ~ obsTest$Soil_Organic_Carbon_kg_m2))
+
 SOM.bias <- optim.test[1:dim(inputsTest)[1],]$Soil_Organic_Carbon_kg_m2 - obsTest$Soil_Organic_Carbon_kg_m2
+
 dim.SOM <- dim(inputsTest)[1]
-RMSE_kg <- sqrt(sum((obsTest$Soil_Organic_Carbon_kg_m2- optim.test[1:dim.SOM,]$Soil_Organic_Carbon_kg_m2)^2, na.rm=T)/dim.SOM)
-AIC <- dim.SOM * log(sum((obsTest$Soil_Organic_Carbon_kg_m2- optim.test[1:dim.SOM,]$Soil_Organic_Carbon_kg_m2)^2, na.rm=T)/dim.SOM) + 2*length(parameters[[3]])
-MBE_SOM <- mean(SOM.bias, na.rm=T)
-MAE_SOM <- mean(abs(SOM.bias), na.rm=T)
-print(list(RMSE_kg = RMSE_kg,AIC = AIC, MAE_SOM = MAE_SOM, MBE_SOM = MBE_SOM, fit.SOM= fit.SOM))
-write.csv(as.data.frame(unlist(list(FitPars = Fit.pools$par, RMSE_kg = RMSE_kg,AIC = AIC, MAE_SOM = MAE_SOM, MBE_SOM = MBE_SOM, df1= fit.SOM$fstatistic[2], df2= fit.SOM$fstatistic[3], Fstat=fit.SOM$fstatistic[1], adjR2=fit.SOM$adj.r.squared))), file=paste0("ParFitResult_",Sys.time(),"_Century.csv"))
+
+RMSE_kg <- sqrt(sum((obsTest$Soil_Organic_Carbon_kg_m2- optim.test[1:dim.SOM,]$Soil_Organic_Carbon_kg_m2)^2, na.rm = T)/dim.SOM)
+
+AIC <- dim.SOM * log(sum((obsTest$Soil_Organic_Carbon_kg_m2 - optim.test[1:dim.SOM,]$Soil_Organic_Carbon_kg_m2)^2, na.rm = T)/dim.SOM) + 2*length(parameters[[3]])
+
+MBE_SOM <- mean(SOM.bias, na.rm = T)
+
+MAE_SOM <- mean(abs(SOM.bias), na.rm = T)
+
+print(list(RMSE_kg = RMSE_kg,AIC = AIC, MAE_SOM = MAE_SOM, MBE_SOM = MBE_SOM, 
+           fit.SOM = fit.SOM))
+
+write.csv(as.data.frame(unlist(list(FitPars = Fit.pools$par, RMSE_kg = RMSE_kg,
+                                    AIC = AIC, MAE_SOM = MAE_SOM, 
+                                    MBE_SOM = MBE_SOM, 
+                                    df1 = fit.SOM$fstatistic[2], 
+                                    df2 = fit.SOM$fstatistic[3], 
+                                    Fstat = fit.SOM$fstatistic[1], 
+                                    adjR2 = fit.SOM$adj.r.squared))), 
+          file = paste0("model_output/ParFitResultCentury_", Sys.Date(), ".csv"))
 ```
 
 #Run Best Parameters
@@ -157,15 +186,19 @@ optim.pools <- Solve_Model_for_Fit_Century(forcing_data_Century, parameters)
 end_time = Sys.time()
 optim.time <- end_time - start_time
 
-ymax_plot <- ceiling(max(max(SOC_obs$Soil_Organic_Carbon_kg_m2, na.rm=T), max(optim.pools$Soil_Organic_Carbon_kg_m2, na.rm=T)))
+ymax_plot <- ceiling(max(max(SOC_obs$Soil_Organic_Carbon_kg_m2, na.rm = T), 
+                         max(optim.pools$Soil_Organic_Carbon_kg_m2, na.rm = T)))
 ymax_plot <- ifelse(ymax_plot>100, 20, ymax_plot)
 
 #pdf(file="fit_Century_AfSIS.pdf", height=4, width=4)
 par(mfrow = c(1,1))
 par(mar = c(3.5,3.7,0,0)+.9)
 par(oma = c(0,0,0,0))
-plot(optim.pools$Soil_Organic_Carbon_kg_m2, SOC_obs$Soil_Organic_Carbon_kg_m2, ylab = expression("Observed OM (kg " ~ m^{2} ~ ")"), xlab = expression("Predicted OM (kg " ~ m^{2} ~ ")"), lwd = 2, type = "p", col = "black", ylim=c(0,ymax_plot), xlim=c(0,ymax_plot))
-legend("topright", c("SOM"), col=c("black"), pch=16)
+plot(optim.pools$Soil_Organic_Carbon_kg_m2, SOC_obs$Soil_Organic_Carbon_kg_m2, 
+     ylab = expression("Observed OM (kg " ~ m^{2} ~ ")"), 
+     xlab = expression("Predicted OM (kg " ~ m^{2} ~ ")"), lwd = 2, type = "p", 
+     col = "black", ylim = c(0,ymax_plot), xlim = c(0,ymax_plot))
+legend("topright", c("SOM"), col = c("black"), pch = 16)
 #dev.off()
 
 cor.test(optim.pools$Soil_Organic_Carbon_kg_m2, SOC_obs$Soil_Organic_Carbon_kg_m2) #r2=0.14

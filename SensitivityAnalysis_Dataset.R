@@ -8,7 +8,7 @@ library(sf)
 library(tmap)
 
 ## Load AfSIS data
-afsis_data <- read.csv("forcing_data/afsis_ref_updated8.csv", as.is = T) %>% 
+afsis_data <- read.csv("forcing_data/afsis_ref_updated9.csv", as.is = T) %>% 
   filter(Depth == "Topsoil")
 
 ## Load africa map
@@ -41,7 +41,7 @@ random_points <- st_sample(
 # Convert to dataframe with longitude and latitude
 random_points_df <- st_coordinates(random_points) %>%
   as.data.frame() %>%
-  rename(Longitude = X, Latitude = Y)
+  dplyr::rename(Longitude = X, Latitude = Y)
 
 random_points_df %>% 
   ggplot(aes(x = Longitude, y = Latitude)) +
@@ -70,7 +70,7 @@ npp_raster
 bd_dir <- "GlobalData/sol_db_od_m_30m_0..20cm_2001..2017_v0.13_wgs84.tif"
 bd_raster <- terra::rast(bd_dir)
 bd_raster
-plot(bd_raster)
+# plot(bd_raster)
 
 ## Extract values from spatial products
 random_points_sf <- st_as_sf(random_points_df, coords = c("Longitude", "Latitude"), 
@@ -89,6 +89,7 @@ random_spatial_points_df <- random_points_df %>%
 summary(random_spatial_points_df)
 
 # Remove rows with any NAs and reduce to 100,000 samples
+set.seed(123)
 random_spatial_points_NA_df <- random_spatial_points_df %>%
   filter(complete.cases(.)) %>% 
   # Convert bulk density from 10×kg/m³ to g/cm³
@@ -99,7 +100,7 @@ random_spatial_points_NA_df <- random_spatial_points_df %>%
 # Prepare observational data (only complete cases)
 afsis_model_data <- afsis_data %>%
   filter(CORG <= 20) %>% 
-  select(Clay_2um, Clay_63um, pH, LIG_N, sm, stemp, npp_modis, bd_extracted) %>%
+  select(Clay_2um, Clay_63um, pH, LIG_N, LIG, sm, stemp, npp_modis, bd_extracted) %>%
   filter(complete.cases(.))
 
 # Fit models for variables without spatial products
@@ -111,12 +112,15 @@ model_pH <- lm(pH ~ sm + stemp + npp_modis + bd_extracted,
                data = afsis_model_data)
 model_LIG_N <- lm(LIG_N ~ sm + stemp + npp_modis + bd_extracted, 
                   data = afsis_model_data)
+model_LIG <- lm(LIG ~ sm + stemp + npp_modis + bd_extracted, 
+                data = afsis_model_data)
 
 # Check model summaries
 summary(model_clay_2um)
 summary(model_clay_63um)
 summary(model_pH)
 summary(model_LIG_N)
+summary(model_LIG)
 
 # Predict values for random points with realistic residual variation
 set.seed(42)
@@ -125,7 +129,8 @@ pred_random_spatial_points_df <- random_spatial_points_NA_df %>%
     Clay_2um = predict(model_clay_2um, .) + rnorm(n(), 0, sigma(model_clay_2um)),
     Clay_63um = predict(model_clay_63um, .) + rnorm(n(), 0, sigma(model_clay_63um)),
     pH = predict(model_pH, .) + rnorm(n(), 0, sigma(model_pH)),
-    LIG_N = predict(model_LIG_N, .) + rnorm(n(), 0, sigma(model_LIG_N))
+    LIG_N = predict(model_LIG_N, .) + rnorm(n(), 0, sigma(model_LIG_N)),
+    LIG = predict(model_LIG, .) + rnorm(n(), 0, sigma(model_LIG))
   )
 
 # Apply constraints based on observed ranges
@@ -140,7 +145,9 @@ pred_point_constr <- pred_random_spatial_points_df %>%
     pH = pmax(min(afsis_model_data$pH), 
               pmin(pH, max(afsis_model_data$pH))),
     LIG_N = pmax(min(afsis_model_data$LIG_N), 
-                 pmin(LIG_N, max(afsis_model_data$LIG_N)))
+                 pmin(LIG_N, max(afsis_model_data$LIG_N))),
+    LIG = pmax(min(afsis_model_data$LIG), 
+               pmin(LIG, max(afsis_model_data$LIG)))
   )
 
 summary(pred_point_constr)
@@ -148,16 +155,18 @@ summary(afsis_model_data)
 
 ## Verify the results look reasonable
 # Compare distributions to observational data
-par(mfrow = c(2, 4))
-for(var in c("Clay_2um", "Clay_63um", "pH", "LIG_N", "sm", "stemp", "npp_modis", "bd_extracted")) {
+par(mfrow = c(2, 5))
+for(var in c("Clay_2um", "Clay_63um", "pH", "LIG_N", "LIG", "sm", "stemp", "npp_modis", "bd_extracted")) {
   hist(afsis_model_data[[var]], main = paste("Observed", var), col = "lightblue", breaks = 30)
   hist(pred_point_constr[[var]], main = paste("Simulated", var), col = "lightcoral", breaks = 30)
 }
 
 
 # Check correlations are maintained
-cor(afsis_model_data[, c("Clay_2um", "sm", "stemp", "npp_modis")])
-cor(pred_point_constr[, c("Clay_2um", "sm", "stemp", "npp_modis")])
+cor(afsis_model_data[, c("Clay_2um", "Clay_63um", "pH", "LIG_N", "LIG", "sm", 
+                         "stemp", "npp_modis", "bd_extracted")])
+cor(pred_point_constr[, c("Clay_2um", "Clay_63um", "pH", "LIG_N", "LIG", "sm", 
+                          "stemp", "npp_modis", "bd_extracted")])
 
 write.csv(pred_point_constr, row.names = FALSE,
           paste0("./forcing_data/sensitivity_analysis_simulated_input_data_",
