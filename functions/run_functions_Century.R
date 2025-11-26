@@ -2,17 +2,18 @@
 #Author: Rose Abramoff
 #Date: Nov 16, 2025
 
+
 ##This function takes as arguments:
 ##1 input data
 ##2 model equations
+    SStime = 1000*365 #time at which steady state solution is evaluated
+
+    #Define constant forcing functions
 ##3 parameters
 ##4 whether or not to calculate the eigenvalues (optional; default = 0; 0 = no, 1 = yes)
 ##5 initial states of pools (optional; default = 1 for all pools and 0 for CO2 flux)
 Solve_Model_Century  <- function(inputdata,derivs,parameters,state=c(StrLitter=1, MetLitter=1, ACTIVE=1, SLOW=1, PASSIVE=1)) {
 
-    SStime = 1000*365 #time at which steady state solution is evaluated
-
-    #Define constant forcing functions
     forc_st <- approxfun(1:SStime, rep(mean(inputdata$forc_st),SStime)) #temperature input function
     forc_sw <- approxfun(1:SStime, rep(mean(inputdata$forc_sw),SStime)) #moisture input function
     forc_npp <- approxfun(1:SStime, rep(mean(inputdata$forc_npp),SStime)) #NPP input function
@@ -63,7 +64,7 @@ Solve_Model_for_Row_Century <- function(row, parameters, state = c(StrLitter=1, 
                                  state.SS$y[3], 
                                  state.SS$y[4], 
                                  state.SS$y[5], 
-                                 sum(state.SS$y[1:5])))
+                                 sum(state.SS$y[3:5]))) #just som pools
   names(modeled) <- c("SSN_row_ID", "StrLitter", "MetLitter", "ACTIVE", "SLOW", "PASSIVE", "Soil_Organic_Carbon_kg_m2")
   
   #re-define type as numeric and convert from g/m2 to kg/m2

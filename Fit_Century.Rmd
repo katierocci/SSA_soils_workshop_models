@@ -72,13 +72,18 @@ inputs <- inputsTrain
 
 #Parameters to fit
 ```{r}
-parToFit.pools <- c(k_active = parameters$k_active, k_slow = parameters$k_slow, k_passive = parameters$k_passive)
-  #unlist(parameters)
-  #c(k_active = parameters$k_active, k_slow = parameters$k_slow, k_passive = parameters$k_passive, t1 = parameters$t1, t2 = parameters$t2, t3 = parameters$t3, t4 = parameters$t4)
+parToFit.pools <- c(k_active = parameters$k_active, k_slow = parameters$k_slow, k_passive = parameters$k_passive,
+                    k_strlitter = parameters$k_strlitter, k_metlitter = parameters$k_metlitter, 
+                    w1 = parameters$w1, w2 = parameters$w2, t1 = parameters$t1, t2 = parameters$t2,
+                    t3 = parameters$t3, t4 = parameters$t4)
+                    #metlitter_to_active = parameters$metlitter_to_active, 
+                    #strlitter_to_active = parameters$strlitter_to_active,
+                    #strlitter_to_slow = parameters$strlitter_to_slow)
+#11/24/25: tried all k's (litter and SOM) and all k's and fraction of litter to SOM parameters and all k's and moisture and temperature, with and without clay  
 
-parToFit.lower <- parToFit.pools*0.1
+parToFit.lower <- c(parToFit.pools[1:5]*0.25, parToFit.pools[6:11]*0.8)
 
-parToFit.upper <- parToFit.pools*10 #1.5
+parToFit.upper <- c(parToFit.pools[1:5]*4, parToFit.pools[6:11]*1.2) 
 ```
 
 #Define cost function
@@ -162,5 +167,11 @@ par(oma = c(0,0,0,0))
 plot(optim.pools$Soil_Organic_Carbon_kg_m2, SOC_obs$Soil_Organic_Carbon_kg_m2, ylab = expression("Observed OM (kg " ~ m^{2} ~ ")"), xlab = expression("Predicted OM (kg " ~ m^{2} ~ ")"), lwd = 2, type = "p", col = "black", ylim=c(0,ymax_plot), xlim=c(0,ymax_plot))
 legend("topright", c("SOM"), col=c("black"), pch=16)
 #dev.off()
+
+cor.test(optim.pools$Soil_Organic_Carbon_kg_m2, SOC_obs$Soil_Organic_Carbon_kg_m2) #r2=0.14
+statmod <- lm(optim.pools$Soil_Organic_Carbon_kg_m2~SOC_obs$Soil_Organic_Carbon_kg_m2)
+summary(statmod)$r.squared #0.14
+RMSE_fit <- sqrt(mean((SOC_obs$Soil_Organic_Carbon_kg_m2 - optim.pools$Soil_Organic_Carbon_kg_m2)^2)) #5.6
+
 ```
 

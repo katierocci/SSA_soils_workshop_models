@@ -133,7 +133,7 @@ curr_r2 <- r2_train
 iters_wo_improve = 0
 
 #Set number of iterations for each parameter proposal 
-MIM_runs <- 100 #originally 200
+MIM_runs <- 10 #originally 200
 
 # Send progress statement to console
 print(paste0("Running ", as.character(MIM_runs), " MCMC iterations"))
@@ -158,6 +158,7 @@ for(i in 1:MIM_runs) {
     if(j == 7) {test_p[1,7] <- runif(1, p_rng[7,2], p_rng[7,3])} #desorb
     if(j == 8) {test_p[1,8] <- runif(1, p_rng[8,2], p_rng[8,3])} #fPHYS
     
+    print(test_p)
     
     #Run MIMICS ftn with test parameters
     MIMout <- MIMrepeat(forcing_df = dataTrain, rparams = test_p)
