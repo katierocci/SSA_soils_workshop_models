@@ -6,9 +6,9 @@ library(tidyverse)
 library(ggpubr)
 
 ## Load default and fitted model runs
-default_run <- read.csv("model_output/all_model_results_default_run_2025-11-26.csv") %>% 
+default_run <- read.csv("model_output/all_model_results_default_run_2025-12-01.csv") %>% 
   mutate(ModelRun = "default") 
-fitted_run <- read.csv("model_output/all_model_results_fitted_run_2025-11-26.csv") %>% 
+fitted_run <- read.csv("model_output/all_model_results_fitted_run_2025-12-01.csv") %>% 
   mutate(ModelRun = "fitted")
 
 ## Load AfSIS data
@@ -21,15 +21,15 @@ both_runs <- default_run %>%
 
 both_runs_obs <-  both_runs %>% 
   filter(Type %in% c("MIMICS", "Millennial", "Century")) %>%
-  rename(Soil_Organic_Carbon_kg_m2_mod = Soil_Organic_Carbon_kg_m2) %>%
+  dplyr::rename(Soil_Organic_Carbon_kg_m2_mod = Soil_Organic_Carbon_kg_m2) %>%
   left_join(
     both_runs %>% 
       filter(Type == "Observed") %>% 
       select(SSN, ModelRun, Soil_Organic_Carbon_kg_m2) %>% 
-      rename(Soil_Organic_Carbon_kg_m2_obs = Soil_Organic_Carbon_kg_m2),
+      dplyr::rename(Soil_Organic_Carbon_kg_m2_obs = Soil_Organic_Carbon_kg_m2),
     by = c("SSN", "ModelRun")
   ) %>%
-  select(SSN, Type, ModelRun, Soil_Organic_Carbon_kg_m2_mod, Soil_Organic_Carbon_kg_m2_obs)
+  dplyr::select(SSN, Type, ModelRun, Soil_Organic_Carbon_kg_m2_mod, Soil_Organic_Carbon_kg_m2_obs)
 
 median(both_runs_obs$Soil_Organic_Carbon_kg_m2_obs)
 
@@ -82,8 +82,9 @@ both_runs_obs %>%
   geom_smooth(method = "lm", aes(fill = ModelRun)) +
   theme_classic(base_size = 16) +
   theme(axis.text = element_text(color = "black")) +
-  scale_y_continuous("Observed SOC stocks [kg m-2]", limits = c(0,24),
+  scale_y_continuous("Observed SOC stocks [kg m-2]", limits = c(NA,24),
                      expand = c(0,0)) +
+  coord_cartesian(ylim = c(0,24)) +
   scale_x_continuous("Modeled SOC stocks [kg m-2]", limits = c(0,41),
                      expand = c(0,0)) +
   scale_color_manual("Model run", values = c("#f03b20", "#feb24c")) +
@@ -102,8 +103,8 @@ both_runs_obs %>%
     size = 4,
     hjust = 0
   )
-ggsave(paste0("./model_output/ModelFits_Century_MIMICS_Millennial_DefaultFitted_",
-              Sys.Date(), ".jpeg"), height = 6, width = 12)  
+ggsave("./figures/ModelFits_Century_MIMICS_Millennial_DefaultFitted.jpeg", 
+       height = 6, width = 12)  
 
 ## Bias plots
 afsis_red <- afsis_data %>% 
@@ -136,7 +137,7 @@ bias_plot_fun_forc_prop <- function(xvar, model){
 f1_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = npp_modis*1000/365) +
   scale_x_continuous("NPP [gC m-2 d-1]") 
 
-f2_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = (Clay_63um)/100) +
+f2_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = Clay_63um) +
   scale_x_continuous("Clay content < 63 um [%]")
 
 f3_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = sm) +
@@ -154,8 +155,8 @@ f6_cen <- bias_plot_fun_forc_prop(model = "Century", xvar = LIG_N) +
 ggarrange(f1_cen, f2_cen, f3_cen, f4_cen, f5_cen, f6_cen,
           common.legend = TRUE, nrow = 2, ncol = 4)
 
-ggsave(paste0("./model_output/BiasPlots_Century_Fitted_forc_",
-              Sys.Date(), ".jpeg"), height = 6, width = 12) 
+ggsave("./figures/BiasPlots_Century_DefaultFitted_forc.jpeg", 
+       height = 6, width = 12) 
 
 # Millennial 
 f1_mil <- bias_plot_fun_forc_prop(model = "Millennial", xvar = npp_modis*1000/365) +
@@ -175,8 +176,8 @@ f5_mil <- bias_plot_fun_forc_prop(model = "Millennial", xvar = pH) +
 
 ggarrange(f1_mil, f2_mil, f3_mil, f4_mil, f5_mil, common.legend = TRUE)
 
-ggsave(paste0("./model_output/BiasPlots_Millennial_DefaultFitted_forc_",
-              Sys.Date(), ".jpeg"), height = 6, width = 12) 
+ggsave("./figures/BiasPlots_Millennial_DefaultFitted_forc.jpeg", 
+       height = 6, width = 12) 
 
 # MIMICS
 f1_mic <- bias_plot_fun_forc_prop(model = "MIMICS", xvar = npp_modis*1000) +
@@ -196,8 +197,8 @@ f5_mic <- bias_plot_fun_forc_prop(model = "MIMICS", xvar = LIG_N) +
 
 ggarrange(f1_mic, f2_mic, f3_mic, f4_mic, f5_mic, common.legend = TRUE)
 
-ggsave(paste0("./model_output/BiasPlots_MIMICS_DefaultFitted_forc_",
-              Sys.Date(), ".jpeg"), height = 6, width = 12) 
+ggsave("./figures/BiasPlots_MIMICS_DefaultFitted_forc.jpeg", 
+       height = 6, width = 12) 
 
 ## function for bias plots with soil parameters
 # Function to extract linear model statistics
@@ -241,7 +242,7 @@ bias_plot_fun_forc_prop <- function(xvar, xvar_name){
     ungroup() %>%
     mutate(
       label = sprintf(
-        "adj. R² = %.2f\np = %.3g\nRMSE = %.2f",
+        "adj. R² = %.2f\np = %.3e\nRMSE = %.2f",
         adj_r_squared, p_value, rmse
       )
     )
@@ -251,68 +252,75 @@ bias_plot_fun_forc_prop <- function(xvar, xvar_name){
     filter(ModelRun == "fitted") %>%  
     ggplot(aes(y = SOC_bias_kg_m2, x = {{xvar}}, color = Type)) +  
     geom_hline(yintercept = 0) +  
-    geom_point(shape = 21) +  
+    geom_point(shape = 21, alpha = 0.2) +  
     geom_smooth(aes(fill = Type), method = "lm") +  
     theme_classic(base_size = 12) +  
     theme(axis.text = element_text(color = "black"),  
           axis.title.y = element_blank()) +  
-    scale_color_manual("Model", values = c("#33a02c",  "#a6cee3", "#1f78b4")) +  
-    scale_fill_manual("Model", values = c("#33a02c",  "#a6cee3", "#1f78b4")) +
+    scale_color_manual("Model", values = c("#1b9e77",  "#d95f02", "#7570b3")) +  
+    scale_fill_manual("Model", values = c("#1b9e77",  "#d95f02", "#7570b3")) +
     geom_text(
       data = stats_table %>% filter(Type == "Century"),
-      aes(x = Inf, y = Inf, label = label), 
-      color = "#33a02c",
+      aes(x = Inf, y = 25, label = label), 
+      color = "#1b9e77",
       inherit.aes = FALSE,
       size = 2.5,
-      hjust = 3.5,
-      vjust = 1.5
+      hjust = 3.5
     ) +
     geom_text(
       data = stats_table %>% filter(Type == "Millennial"),
-      aes(x = Inf, y = Inf, label = label), 
-      color = "#a6cee3",
+      aes(x = Inf, y = 25, label = label), 
+      color = "#d95f02",
       inherit.aes = FALSE,
       size = 2.5,
-      hjust = 2.4,
-      vjust = 1.5
+      hjust = 2.4
     ) +
     geom_text(
       data = stats_table %>% filter(Type == "MIMICS"),
-      aes(x = Inf, y = Inf, label = label), 
-      color = "#1f78b4",
+      aes(x = Inf, y = 25, label = label), 
+      color = "#7570b3",
       inherit.aes = FALSE,
       size = 2.5,
-      hjust = 1.1,
-      vjust = 1.5
+      hjust = 1.1
     )
 }
 
 # Create plots with the updated function
 s1 <- bias_plot_fun_forc_prop(Am_Ox_Al/1000, "Am_Ox_Al") +  
-  scale_x_continuous("Oxalate-extractable Al [g kg-1]")  
+  scale_x_continuous("Oxalate-extractable Al [g kg-1]", expand = c(0,0))  
 s2 <- bias_plot_fun_forc_prop(Am_Ox_Fe/1000, "Am_Ox_Fe") +  
-  scale_x_continuous("Oxalate-extractable Fe [g kg-1]")  
+  scale_x_continuous("Oxalate-extractable Fe [g kg-1]", expand = c(0,0))  
 s3 <- bias_plot_fun_forc_prop(pH, "pH") +  
-  scale_x_continuous("pH")  
+  scale_x_continuous("pH", expand = c(0,0))  
 s4 <- bias_plot_fun_forc_prop(Caex, "Caex") +  
-  scale_x_continuous("exchangeable Ca [cmol kg-1 soil-1]")  
+  scale_x_continuous("exchangeable Ca [cmol kg-1 soil-1]", expand = c(0,0))  
 s5 <- bias_plot_fun_forc_prop(Clay_2um, "Clay_2um") +  
-  scale_x_continuous("Clay content < 2 um [%]")  
+  scale_x_continuous("Clay content < 2 um [%]", expand = c(0,0))  
 s6 <- bias_plot_fun_forc_prop(Clay_63um, "Clay_63um") +  
-  scale_x_continuous("Clay + fine silt content < 63 um [%]")  
+  scale_x_continuous("Clay + fine silt content < 63 um [%]", expand = c(0,0))  
 s7 <- bias_plot_fun_forc_prop(Clay_1_1, "Clay_1_1") +  
-  scale_x_continuous("1:1 clay minerals [%]")  
+  scale_x_continuous("1:1 clay minerals [%]", expand = c(0,0))  
 s8 <- bias_plot_fun_forc_prop(Clay_2_1, "Clay_2_1") +  
-  scale_x_continuous("2:1 clay minerals [%]")  
+  scale_x_continuous("2:1 clay minerals [%]", expand = c(0,0))  
 
 # Combine plots
 annotate_figure(  
   ggarrange(s1, s2, s3, s4, s5, s6, s7, s8, common.legend = TRUE,  
             ncol = 4, nrow = 2),  
-  left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 14))
+  left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 12))
 
-ggsave(paste0("./model_output/BiasPlots_Century_MIMICS_Millennial_Fitted_soil_",
-              Sys.Date(), ".jpeg"), height = 6, width = 12) 
+ggsave("./figures/BiasPlots_Century_MIMICS_Millennial_Fitted_soil.jpeg", 
+       height = 6, width = 12)
+
+# Figure for Cornell talk:
+# annotate_figure(  
+#   ggarrange(s4, s5, s7, s8, common.legend = TRUE,  
+#             ncol = 4, nrow = 1),  
+#   left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 12))
+# 
+# ggsave("./figures/BiasPlots_Century_MIMICS_Millennial_Fitted_soil_red.jpeg", 
+#        height = 4, width = 12)
+
 
 # Spatial plotting
 s9 <- bias_plot_fun_forc_prop(Longitude, "Longitude")
@@ -320,7 +328,7 @@ s10 <- bias_plot_fun_forc_prop(Latitude, "Latitude")
 
 annotate_figure(  
   ggarrange(s9, s10, common.legend = TRUE),  
-  left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 14))
+  left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 12))
 
-ggsave(paste0("./model_output/BiasPlots_Century_MIMICS_Millennial_Fitted_long_lat_",
-              Sys.Date(), ".jpeg"), height = 6, width = 12) 
+ggsave("./figures/BiasPlots_Century_MIMICS_Millennial_Fitted_long_lat.jpeg", 
+       height = 6, width = 12) 
