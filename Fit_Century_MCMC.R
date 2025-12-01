@@ -268,10 +268,10 @@ for(i in 1:Cen_runs) {
     Cenout <- Cenout %>% inner_join(Cent_ids, by="site_id")
     #r2 and RMSE
     Train_ModObs_MCMC <- Cenout %>% mutate(X, SOC.mod = (ACTIVE + SLOW + PASSIVE) / 1000) %>% select(X,SOC.mod) %>% inner_join(obsTrain, by="X") #StrLitter + MetLitter + 
-    RMSE_MCMC <- sqrt(mean((Train_ModObs_MCMC$SOC - Train_ModObs_MCMC$SOC.mod)^2)) #5.13
+    RMSE_MCMC <- sqrt(mean((Train_ModObs_MCMC$SOC - Train_ModObs_MCMC$SOC.mod)^2))
     lm_MCMC <- lm(SOC ~ SOC.mod, data = Train_ModObs_MCMC)
     lm_sum_MCMC <- summary(lm_MCMC)
-    r2_MCMC <- lm_sum_MCMC$adj.r.squared #0.13
+    r2_MCMC <- lm_sum_MCMC$adj.r.squared
     #print(RMSE_MCMC)
     #print(r2_MCMC)
     
@@ -312,7 +312,7 @@ for(i in 1:Cen_runs) {
       # ONLY USEFUL IF COMPUTATIONAL POWER IS LIMITED, comment out if not
       #######################################################################
       # Set walk rate
-      walk_rt = 2 # Set the parameter range min to be the current value divided by
+      walk_rt = 1.2 #orignally 2 # Set the parameter range min to be the current value divided by
       # this number, and the max to the current value multiplied
       # by this number
       
@@ -378,7 +378,7 @@ nbrOfWorkers()
 # Plot MCMC walk
 #######################
 
-write.csv(MCMC_out, "Century_MCMC_out_112525.csv")
+write.csv(MCMC_out, "Century_MCMC_out_112825_100.csv")
 
 pRMSE <- ggplot(MCMC_out, aes(x=iter, y=RMSE)) + geom_line(color="grey50", alpha=0.5) + geom_point(size=3, color="grey50", alpha=0.5)  + geom_line(data=MCMC_out %>% filter(improve > 0), color="red", linewidth=1) + geom_point(data=MCMC_out %>% filter(improve > 0), color="red", size=4) + theme_minimal() +theme(legend.position = "none")
 pr2 <- ggplot(MCMC_out, aes(x=iter, y=r2)) + geom_line(color="grey50", alpha=0.5) + geom_point(size=3, color="grey50", alpha=0.5)  + geom_line(data=MCMC_out %>% filter(improve > 0), color="red", linewidth=1) + geom_point(data=MCMC_out %>% filter(improve > 0), color="red", size=4) + theme_minimal() +theme(legend.position = "none")
@@ -398,16 +398,17 @@ walk_plot <- grid.arrange(pRMSE, pr2, pTau_x, pCUE_x, pDesorb_x, pFPHYS_x, pVslo
 MCMC_out_improved <- MCMC_out%>%filter(improve == 1) %>%mutate(cost = (RMSE/100)-r2)
 hist(MCMC_out_improved$RMSE)
 hist(MCMC_out_improved$r2)
-MCMC_SingleBest <- MCMC_out %>% filter(iter==5 & i==1)
+MCMC_SingleBest <- MCMC_out %>% filter(iter==5 & i==1) #current best
 write.csv(MCMC_SingleBest, "parameters/Century_MCMC_out_SingleBest_112625.csv")
 
 
-#filtering later
-MCMC_out <- read.csv("Century_MCMC_out_112525.csv")
-MCMC_out_filt3 <- MCMC_out %>% filter(w1_x>0.5, w1_x<2,w2_x>0.5, w2_x<2,t3_x>0.5, t3_x<2,t4_x>0.5, t4_x<2,k_active_x>0.5, k_active_x<2,k_slow_x>0.5, k_slow_x<2,k_passive_x>0.5, k_passive_x<2,
-                                      metlitter_to_active_x>0.5, metlitter_to_active_x<2,strlitter_to_active_x>0.5, strlitter_to_active_x<2, strlitter_to_slow_x>0.5, strlitter_to_slow_x<2) 
-MCMC_SingleBest2 <- MCMC_out %>% filter(iter==5 & i==1)
-write.csv(MCMC_SingleBest2, "parameters/Century_MCMC_out_SingleBest2_112625.csv")
+#filtering later or alternate for MCMC_out on 11/26
+MCMC_out <- read.csv("Century_MCMC_out_112526.csv")
+#MCMC_out_filt3 <- MCMC_out %>% filter(w1_x>0.7, w1_x<1.5,w2_x>0.7, w2_x<1.5,t3_x>0.7, t3_x<1.5,t4_x>0.7, t4_x<1.5,k_active_x>0.7, k_active_x<1.5,k_slow_x>0.7, k_slow_x<1.5,k_passive_x>0.7, k_passive_x<1.5,
+#                                      metlitter_to_active_x>0.7, metlitter_to_active_x<1.5,strlitter_to_active_x>0.7, strlitter_to_active_x<1.5, strlitter_to_slow_x>0.7, strlitter_to_slow_x<1.5) 
+#MCMC_out_filt4 <- MCMC_out %>% filter(improve==1)
+#MCMC_SingleBest2 <- MCMC_out %>% filter(iter==295 & i==99) 
+write.csv(MCMC_SingleBest2, "parameters/Century_MCMC_out_SingleBest2_113025.csv")
 
 #save plot
 ggsave(file=paste0("MCMC/Output/", format(Sys.time(), "%Y%m%d_%H%M%S_"), "MIM_MCMC_pCombos-", as.character(MIM_runs),"_walk_plot", ".jpeg"), 
