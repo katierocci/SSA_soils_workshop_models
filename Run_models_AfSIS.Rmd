@@ -102,25 +102,24 @@ forcing_data_Century <- forcing_data %>%
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
 parameters.file <- read.table(here("parameters/soilpara_in_century.txt")) #default
 #parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA_Century.txt")) #fitted
+
 #uncomment next two code chunks for fitted
-parameters.MCMC <- read.csv("parameters/Century_MCMC_out_SingleBest_112625.csv") #MCMC fitted
-parameters.file <- parameters.file %>% mutate(V2 = case_when(
-    V1 == "w1" ~ V2*parameters.MCMC$w1_x,
-    V1 == "w2" ~ V2*parameters.MCMC$w2_x,
-    V1 == "t3" ~ V2*parameters.MCMC$t3_x,
-    V1 == "t4" ~ V2*parameters.MCMC$t4_x,
-    V1 == "k_active" ~ V2*parameters.MCMC$k_active_x,
-    V1 == "k_slow" ~ V2*parameters.MCMC$k_slow_x,
-    V1 == "k_passive" ~ V2*parameters.MCMC$k_passive_x,
-    V1 == "metlitter_to_active" ~ V2*parameters.MCMC$metlitter_to_active_x,
-    V1 == "strlitter_to_active" ~ V2*parameters.MCMC$strlitter_to_active_x,
-    V1 == "strlitter_to_slow" ~ V2*parameters.MCMC$strlitter_to_slow_x,
-    TRUE ~ V2  # Keep original value if no condition met
-  ))
+# parameters.MCMC <- read.csv("parameters/Century_MCMC_out_SingleBest_112625.csv") #MCMC fitted
+# parameters.file <- parameters.file %>% mutate(V2 = case_when(
+#     V1 == "w1" ~ V2*parameters.MCMC$w1_x,
+#     V1 == "w2" ~ V2*parameters.MCMC$w2_x,
+#     V1 == "t3" ~ V2*parameters.MCMC$t3_x,
+#     V1 == "t4" ~ V2*parameters.MCMC$t4_x,
+#     V1 == "k_active" ~ V2*parameters.MCMC$k_active_x,
+#     V1 == "k_slow" ~ V2*parameters.MCMC$k_slow_x,
+#     V1 == "k_passive" ~ V2*parameters.MCMC$k_passive_x,
+#     V1 == "metlitter_to_active" ~ V2*parameters.MCMC$metlitter_to_active_x,
+#     V1 == "strlitter_to_active" ~ V2*parameters.MCMC$strlitter_to_active_x,
+#     V1 == "strlitter_to_slow" ~ V2*parameters.MCMC$strlitter_to_slow_x,
+#     TRUE ~ V2  # Keep original value if no condition met
+#   ))
 parameters <- as.list(parameters.file$V2)
 names(parameters) <- parameters.file$V1
-
-
 
 # Function to run model for one row of site parameters
 run_model_for_site <- function(site_row, base_params) {
@@ -185,15 +184,15 @@ hist(Century_ss_AllSites$Soil_Organic_Carbon_kg_m2)
 source(here("parameters/MIMICS_parameters_sandbox_20231129.R"))
 
 #IF using parameterized MIMICS uncomment lines of code preceding model run
-MCMC_SingleBest <- read.csv('AfSIS_MIMICS_MCMC_Parameterized.csv')
-Tau_MULT <<- Tau_MULT*MCMC_SingleBest$Tau_x
-desorb_MULT <<- desorb_MULT*MCMC_SingleBest$desorb_x
-fPHYS_MULT <<- fPHYS_MULT*MCMC_SingleBest$fPHYS_x
-Vslope_MULT <<- Vslope_MULT*MCMC_SingleBest$Vslope_x
-Vint_MULT <<- Vint_MULT*MCMC_SingleBest$Vint_x
-Kslope_MULT <<- Kslope_MULT*MCMC_SingleBest$Kslope_x
-Kint_MULT <<- Kint_MULT*MCMC_SingleBest$Kint_x
-CUE_MULT <<- CUE_MULT*MCMC_SingleBest$CUE_x
+# MCMC_SingleBest <- read.csv('AfSIS_MIMICS_MCMC_Parameterized.csv')
+# Tau_MULT <<- Tau_MULT*MCMC_SingleBest$Tau_x
+# desorb_MULT <<- desorb_MULT*MCMC_SingleBest$desorb_x
+# fPHYS_MULT <<- fPHYS_MULT*MCMC_SingleBest$fPHYS_x
+# Vslope_MULT <<- Vslope_MULT*MCMC_SingleBest$Vslope_x
+# Vint_MULT <<- Vint_MULT*MCMC_SingleBest$Vint_x
+# Kslope_MULT <<- Kslope_MULT*MCMC_SingleBest$Kslope_x
+# Kint_MULT <<- Kint_MULT*MCMC_SingleBest$Kint_x
+# CUE_MULT <<- CUE_MULT*MCMC_SingleBest$CUE_x
 
 #run the model for all sites
 MIMruns <- forcing_data_MIMICS %>% 
@@ -231,8 +230,8 @@ ggplot(MIMICS_ss_AllSites) +
 #Run Millennial at AfSIS sites
 ```{r}
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
-#parameters.file <- read.table(here("parameters/soilpara_in_fit_with_qmax.txt")) #default
-parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA_Millennial.txt")) #fitted
+parameters.file <- read.table(here("parameters/soilpara_in_fit_with_qmax.txt")) #default
+# parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA_Millennial.txt")) #fitted
 parameters <- as.list(parameters.file$V2)
 names(parameters) <- parameters.file$V1
 
@@ -292,43 +291,43 @@ hist(Millennial_ss_AllSites$Soil_Organic_Carbon_kg_m2)
 # Combine output
 ```{r}
 # Default Runs
-# all_models_default <- rbind(MIMICS_ss_AllSites %>%
-#                               dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-#                             Millennial_ss_AllSites %>%
-#                               dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-#                             Century_ss_AllSites %>%
-#                               dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-#                             forcing_data %>%
-#                               mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
-#                                      Type = "Observed") %>%
-#                               select(SSN, Soil_Organic_Carbon_kg_m2, Type))
-# 
-# write.csv(all_models_default, row.names = FALSE,
-#           paste0("./model_output/all_model_results_default_run_",
-#           Sys.Date(), ".csv"))
-# 
-# ggplot(all_models_default, aes(x = Soil_Organic_Carbon_kg_m2)) +
-#   geom_histogram(bins = 30, fill = "steelblue", color = "white") +
-#   facet_wrap(~ Type, ncol = 1)
-
-# Fitted Runs
-all_models_fitted <- rbind(MIMICS_ss_AllSites %>%
-                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-                     Millennial_ss_AllSites %>%
-                       dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-                     Century_ss_AllSites %>%
+all_models_default <- rbind(MIMICS_ss_AllSites %>%
                               dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
-                     forcing_data %>%
-                       mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
-                              Type = "Observed") %>%
-                       select(SSN, Soil_Organic_Carbon_kg_m2, Type))
-write.csv(all_models_fitted, row.names = FALSE,
-          paste0("./model_output/all_model_results_fitted_run_",
+                            Millennial_ss_AllSites %>%
+                              dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+                            Century_ss_AllSites %>%
+                              dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+                            forcing_data %>%
+                              mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
+                                     Type = "Observed") %>%
+                              select(SSN, Soil_Organic_Carbon_kg_m2, Type))
+
+write.csv(all_models_default, row.names = FALSE,
+          paste0("./model_output/all_model_results_default_run_",
           Sys.Date(), ".csv"))
 
-ggplot(all_models_fitted, aes(x = Soil_Organic_Carbon_kg_m2)) +
+ggplot(all_models_default, aes(x = Soil_Organic_Carbon_kg_m2)) +
   geom_histogram(bins = 30, fill = "steelblue", color = "white") +
   facet_wrap(~ Type, ncol = 1)
+
+# Fitted Runs
+# all_models_fitted <- rbind(MIMICS_ss_AllSites %>%
+#                        dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+#                      Millennial_ss_AllSites %>%
+#                        dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+#                      Century_ss_AllSites %>%
+#                               dplyr::select(SSN, Soil_Organic_Carbon_kg_m2, Type),
+#                      forcing_data %>%
+#                        mutate(Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
+#                               Type = "Observed") %>%
+#                        select(SSN, Soil_Organic_Carbon_kg_m2, Type))
+# write.csv(all_models_fitted, row.names = FALSE,
+#           paste0("./model_output/all_model_results_fitted_run_",
+#           Sys.Date(), ".csv"))
+# 
+# ggplot(all_models_fitted, aes(x = Soil_Organic_Carbon_kg_m2)) +
+#   geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+#   facet_wrap(~ Type, ncol = 1)
 
 ```
 
