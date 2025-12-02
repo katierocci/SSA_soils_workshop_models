@@ -477,4 +477,4 @@ annotate_figure(
   left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 12))
 
 ggsave("./figures/BiasPlots_Century_MIMICS_Millennial_Fitted_long_lat.jpeg", 
-       height = 6, width = 12) 
+       height = 5, width = 9) 
