@@ -13,6 +13,7 @@ library(dplyr)
 library(corrplot)
 library(here)
 library(purrr)
+library(rootSolve)
 ```
 
 #Read in SSA data and load Century components
@@ -51,7 +52,25 @@ forcing_data_Century <- forcing_data %>%
 #load parameter changes (if needed)
 ```{r}
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
-parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA_Century.txt")) #fitted
+parameters.file <- read.table(here("parameters/soilpara_in_century.txt")) #default
+#parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA_Century.txt")) #fitted
+
+#uncomment next two code chunks for fitted
+parameters.MCMC <- read.csv("parameters/Century_MCMC_out_SingleBest_112625.csv") #MCMC fitted
+parameters.file <- parameters.file %>% 
+  mutate(V2 = case_when(
+    V1 == "w1" ~ V2*parameters.MCMC$w1_x,
+    V1 == "w2" ~ V2*parameters.MCMC$w2_x,
+    V1 == "t3" ~ V2*parameters.MCMC$t3_x,
+    V1 == "t4" ~ V2*parameters.MCMC$t4_x,
+    V1 == "k_active" ~ V2*parameters.MCMC$k_active_x,
+    V1 == "k_slow" ~ V2*parameters.MCMC$k_slow_x,
+    V1 == "k_passive" ~ V2*parameters.MCMC$k_passive_x,
+    V1 == "metlitter_to_active" ~ V2*parameters.MCMC$metlitter_to_active_x,
+    V1 == "strlitter_to_active" ~ V2*parameters.MCMC$strlitter_to_active_x,
+    V1 == "strlitter_to_slow" ~ V2*parameters.MCMC$strlitter_to_slow_x,
+    TRUE ~ V2  # Keep original value if no condition met
+  ))
 parameters <- as.list(parameters.file$V2)
 names(parameters) <- parameters.file$V1
 ```
@@ -105,11 +124,10 @@ results_list <- apply(forcing_data_Century, 1, function(row) {
 # Combine all into one dataframe
 Century_ss <- dplyr::bind_rows(results_list)
 
-
 # Merge model outputs with original site parameters if needed
 Century_ss_AllSites <- forcing_data_Century %>%
   left_join(Century_ss, by = "site_id") %>%
-  mutate(Soil_Organic_Carbon_kg_m2 = (StrLitter + MetLitter + ACTIVE + SLOW + PASSIVE) / 1000)
+  mutate(Soil_Organic_Carbon_kg_m2 = (ACTIVE + SLOW + PASSIVE) / 1000)
 
 write.csv(Century_ss_AllSites, row.names = FALSE,
           paste0("./model_output/Century_SensitivityAnalysisOutput_",
