@@ -16,9 +16,9 @@ library(purrr)
 library(Metrics)
 library(SoilR)
 
-safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
-                             "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888",
-                             "#E69F00", "#D55E00")
+# safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
+#                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888",
+#                              "#E69F00", "#D55E00")
 
 #load mimics model components
 source(here("ODEs/RXEQ.R"))
@@ -212,12 +212,12 @@ MIM_ss_long <- MIMICS_ss_AllSites %>%
   select(SET,LITm, LITs, MICr, MICk, SOMa, SOMc, SOMp) %>% 
   pivot_longer(cols = 2:8, names_to = 'Pool', values_to = 'C_content')
 
-ggplot(MIM_ss_long) + 
-  geom_boxplot(aes(x = Pool, y = C_content, fill = Pool, group = Pool)) + 
-  ylab("Pool C content 0-30cm (mgC/cm3") + 
-  xlab("Pool") + 
-  scale_fill_manual(values = safe_colorblind_palette, guide = "none") + 
-  theme_bw(base_size = 14)
+# ggplot(MIM_ss_long) + 
+#   geom_boxplot(aes(x = Pool, y = C_content, fill = Pool, group = Pool)) + 
+#   ylab("Pool C content 0-30cm (mgC/cm3") + 
+#   xlab("Pool") + 
+#   scale_fill_manual(values = safe_colorblind_palette, guide = "none") + 
+#   theme_bw(base_size = 14)
 
 #compare inputs and outputs
 ggplot(MIMICS_ss_AllSites) + 

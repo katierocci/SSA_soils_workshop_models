@@ -13,6 +13,7 @@ library(dplyr)
 library(corrplot)
 library(here)
 library(purrr)
+library(rootSolve)
 ```
 
 #Read in SSA data and load Millennial components
