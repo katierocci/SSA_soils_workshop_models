@@ -134,16 +134,16 @@ max_RMSE=100
 ## Values are multipliers of default parameters for Century parameters
 ########################################
 
-p_rng <- data.frame(Parameter = c("w1", "w2", "t3", "t4", "k_active", "k_slow", "k_passive", 
+p_rng <- data.frame(Parameter = c("k_active", "k_slow", "k_passive", #"w1", "w2", "t3", "t4", 
                                   "metlitter_to_active", "strlitter_to_active", "strlitter_to_slow"),
-                    P_min = c(0.8, 0.8, 0.8, 0.8, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25),
-                    P_max = c(1.2, 1.2, 1.2, 1.2, 4, 4, 4, 1.4, 1.4, 1.4))
+                    P_min = c(0.25, 0.25, 0.25, 0.25, 0.25, 0.25), #0.8, 0.8, 0.8, 0.8, 
+                    P_max = c(4, 4, 4, 1.4, 1.4, 1.4)) #1.2, 1.2, 1.2, 1.2, 
 
 #defaults
-w1_default = parameters.file[1,2]
-w2_default = parameters.file[3,2]
-t3_default = parameters.file[5,2]
-t4_default = parameters.file[6,2]
+# w1_default = parameters.file[1,2]
+# w2_default = parameters.file[3,2]
+# t3_default = parameters.file[5,2]
+# t4_default = parameters.file[6,2]
 k_active_default = parameters.file[9,2]
 k_slow_default = parameters.file[10,2]
 k_passive_default = parameters.file[11,2]
@@ -156,10 +156,10 @@ strlitter_to_slow_default = parameters.file[20,2]
 ########################################
 MCMC_out <- data.frame(i=0,
                        iter=1,
-                       w1_x=1,
-                       w2_x=1,
-                       t3_x=1,
-                       t4_x=1,
+                       # w1_x=1,
+                       # w2_x=1,
+                       # t3_x=1,
+                       # t4_x=1,
                        k_active_x=1,
                        k_slow_x=1,
                        k_passive_x=1,
@@ -188,10 +188,10 @@ start_time <- Sys.time()
 ################################
 
 #set initial loop values (aka initial priors)
-curr_p <- data.frame(w1_x=1,
-                     w2_x=1,
-                     t3_x=1,
-                     t4_x=1,
+curr_p <- data.frame(#w1_x=1,
+#                      w2_x=1,
+#                      t3_x=1,
+#                      t4_x=1,
                      k_active_x=1,
                      k_slow_x=1,
                      k_passive_x=1,
@@ -212,7 +212,7 @@ curr_r2 <- r2_train
 iters_wo_improve = 0
 
 #Set number of iterations for each parameter proposal 
-Cen_runs <- 100 #originally 200
+Cen_runs <- 50 #originally 200
 
 # Send progress statement to console
 print(paste0("Running ", as.character(Cen_runs), " MCMC iterations"))
@@ -223,35 +223,35 @@ for(i in 1:Cen_runs) {
   
   print(paste0("Running proposal set #", as.character(i)))
   
-  for(j in 1:10) {
+  for(j in 1:6) { #1:10
     
     #Set new parameter value
     test_p <- curr_p
     #print(test_p)
     
     #Get random parameters to test, in groups
-    if(j == 1) {test_p[1,1] <- runif(1, p_rng[1,2], p_rng[1,3])} #w1
-    if(j == 2) {test_p[1,2] <- runif(1, p_rng[2,2], p_rng[2,3])} #w2
-    if(j == 3) {test_p[1,3] <- runif(1, p_rng[3,2], p_rng[3,3])} #t3
-    if(j == 4) {test_p[1,4] <- runif(1, p_rng[4,2], p_rng[4,3])} #t4
-    if(j == 5) {test_p[1,5] <- runif(1, p_rng[5,2], p_rng[5,3])} #k_active
-    if(j == 6) {test_p[1,6] <- runif(1, p_rng[6,2], p_rng[6,3])} #k_slow
-    if(j == 7) {test_p[1,7] <- runif(1, p_rng[7,2], p_rng[7,3])} #k_passive
-    if(j == 8) {test_p[1,8] <- runif(1, p_rng[8,2], p_rng[8,3])} #metlitter_to_active
-    if(j == 9) {test_p[1,9] <- runif(1, p_rng[9,2], p_rng[9,3])} #strlitter_to_active
-    if(j == 10) {test_p[1,10] <- runif(1, p_rng[10,2], p_rng[10,3])} #strlitter_to_slow
+    # if(j == 1) {test_p[1,1] <- runif(1, p_rng[1,2], p_rng[1,3])} #w1
+    # if(j == 2) {test_p[1,2] <- runif(1, p_rng[2,2], p_rng[2,3])} #w2
+    # if(j == 3) {test_p[1,3] <- runif(1, p_rng[3,2], p_rng[3,3])} #t3
+    # if(j == 4) {test_p[1,4] <- runif(1, p_rng[4,2], p_rng[4,3])} #t4
+    if(j == 1) {test_p[1,1] <- runif(1, p_rng[1,2], p_rng[1,3])} #k_active
+    if(j == 2) {test_p[1,2] <- runif(1, p_rng[2,2], p_rng[2,3])} #k_slow
+    if(j == 3) {test_p[1,3] <- runif(1, p_rng[3,2], p_rng[3,3])} #k_passive
+    if(j == 4) {test_p[1,4] <- runif(1, p_rng[4,2], p_rng[4,3])} #metlitter_to_active
+    if(j == 5) {test_p[1,5] <- runif(1, p_rng[5,2], p_rng[5,3])} #strlitter_to_active
+    if(j == 6) {test_p[1,6] <- runif(1, p_rng[6,2], p_rng[6,3])} #strlitter_to_slow
     
     #apply random parameters
-    parameters_MCMC[1,2] = w1_default * test_p$w1_x[1]
-    parameters_MCMC[2,2] = w2_default * test_p$w2_x[1]
-    parameters_MCMC[3,2] = t3_default * test_p$t3_x[1]
-    parameters_MCMC[4,2] = t4_default * test_p$t4_x[1]
-    parameters_MCMC[5,2] = k_active_default * test_p$k_active_x[1]
-    parameters_MCMC[6,2] = k_slow_default * test_p$k_slow_x[1]
-    parameters_MCMC[7,2] = k_passive_default * test_p$k_passive_x[1]
-    parameters_MCMC[8,2] = metlitter_to_active_default * test_p$metlitter_to_active_x[1]
-    parameters_MCMC[9,2] = strlitter_to_active_default * test_p$strlitter_to_active_x[1]
-    parameters_MCMC[10,2] = strlitter_to_slow_default * test_p$strlitter_to_slow_x[1]
+    # parameters_MCMC[1,2] = w1_default * test_p$w1_x[1]
+    # parameters_MCMC[2,2] = w2_default * test_p$w2_x[1]
+    # parameters_MCMC[3,2] = t3_default * test_p$t3_x[1]
+    # parameters_MCMC[4,2] = t4_default * test_p$t4_x[1]
+    parameters_MCMC[1,2] = k_active_default * test_p$k_active_x[1]
+    parameters_MCMC[2,2] = k_slow_default * test_p$k_slow_x[1]
+    parameters_MCMC[3,2] = k_passive_default * test_p$k_passive_x[1]
+    parameters_MCMC[4,2] = metlitter_to_active_default * test_p$metlitter_to_active_x[1]
+    parameters_MCMC[5,2] = strlitter_to_active_default * test_p$strlitter_to_active_x[1]
+    parameters_MCMC[6,2] = strlitter_to_slow_default * test_p$strlitter_to_slow_x[1]
     parameters_list <- as.list(parameters_MCMC$V2)
     names(parameters_list) <- parameters_MCMC$V1
     #print(parameters_MCMC)
@@ -278,16 +278,16 @@ for(i in 1:Cen_runs) {
     #log parameter updates in dataframe
     iter_out <- data.frame(i=i,
                            iter = ((i-1)*3) + j, 
-                           w1_x=test_p[1],
-                           w2_x=test_p[2],
-                           t3_x=test_p[3],
-                           t4_x=test_p[4],
-                           k_active_x=test_p[5],
-                           k_slow_x=test_p[6],
-                           k_passive_x=test_p[7],
-                           metlitter_to_active_x=test_p[8],
-                           strlitter_to_active_x=test_p[9],
-                           strlitter_to_slow_x=test_p[10],
+                           # w1_x=test_p[1],
+                           # w2_x=test_p[2],
+                           # t3_x=test_p[3],
+                           # t4_x=test_p[4],
+                           k_active_x=test_p[1],
+                           k_slow_x=test_p[2],
+                           k_passive_x=test_p[3],
+                           metlitter_to_active_x=test_p[4],
+                           strlitter_to_active_x=test_p[5],
+                           strlitter_to_slow_x=test_p[6],
                            r2=r2_MCMC,
                            RMSE=RMSE_MCMC,
                            improve=0)
@@ -318,35 +318,35 @@ for(i in 1:Cen_runs) {
       
       # New proposal distributions
       ####################################
-      p_rng[1,2] <- iter_out$w1_x / walk_rt # V_slope min
-      p_rng[1,3] <- iter_out$w1_x +(iter_out$w1_x-(iter_out$w1_x/walk_rt)) # V_slope max
+      # p_rng[1,2] <- iter_out$w1_x / walk_rt # V_slope min
+      # p_rng[1,3] <- iter_out$w1_x +(iter_out$w1_x-(iter_out$w1_x/walk_rt)) # V_slope max
+      # 
+      # p_rng[2,2] <- iter_out$w2_x / walk_rt # V_int min
+      # p_rng[2,3] <- iter_out$w2_x +(iter_out$w2_x-(iter_out$w2_x/walk_rt)) # V_int max
+      # 
+      # p_rng[3,2] <- iter_out$t3_x / walk_rt # K_slope min
+      # p_rng[3,3] <- iter_out$t3_x +(iter_out$t3_x-(iter_out$t3_x/walk_rt)) # K_slope max
+      # 
+      # p_rng[3,2] <- iter_out$t4_x / walk_rt # K_int min
+      # p_rng[3,3] <- iter_out$t4_x +(iter_out$t4_x-(iter_out$t4_x/walk_rt)) # K_int max
       
-      p_rng[2,2] <- iter_out$w2_x / walk_rt # V_int min
-      p_rng[2,3] <- iter_out$w2_x +(iter_out$w2_x-(iter_out$w2_x/walk_rt)) # V_int max
+      p_rng[1,2] <- iter_out$k_active_x / walk_rt # Tau min
+      p_rng[1,3] <- iter_out$k_active_x +(iter_out$k_active_x-(iter_out$k_active/walk_rt)) # Tau max
       
-      p_rng[3,2] <- iter_out$t3_x / walk_rt # K_slope min
-      p_rng[3,3] <- iter_out$t3_x +(iter_out$t3_x-(iter_out$t3_x/walk_rt)) # K_slope max
+      p_rng[2,2] <- iter_out$k_slow_x / walk_rt # CUE min
+      p_rng[2,3] <- iter_out$k_slow_x +(iter_out$k_slow_x-(iter_out$k_slow_x/walk_rt)) # CUE max
       
-      p_rng[3,2] <- iter_out$t4_x / walk_rt # K_int min
-      p_rng[3,3] <- iter_out$t4_x +(iter_out$t4_x-(iter_out$t4_x/walk_rt)) # K_int max
+      p_rng[3,2] <- iter_out$k_passive_x / walk_rt # desorb min
+      p_rng[3,3] <- iter_out$k_passive_x +(iter_out$k_passive_x-(iter_out$k_passive_x/walk_rt)) # desorb max
       
-      p_rng[5,2] <- iter_out$k_active_x / walk_rt # Tau min
-      p_rng[5,3] <- iter_out$k_active_x +(iter_out$k_active_x-(iter_out$k_active/walk_rt)) # Tau max
+      p_rng[4,2] <- iter_out$metlitter_to_active_x / walk_rt # fPHYS min
+      p_rng[4,3] <- iter_out$metlitter_to_active_x +(iter_out$metlitter_to_active_x-(iter_out$metlitter_to_active_x/walk_rt)) # fPHYS max
       
-      p_rng[6,2] <- iter_out$k_slow_x / walk_rt # CUE min
-      p_rng[6,3] <- iter_out$k_slow_x +(iter_out$k_slow_x-(iter_out$k_slow_x/walk_rt)) # CUE max
+      p_rng[5,2] <- iter_out$strlitter_to_active_x / walk_rt # fPHYS min
+      p_rng[5,3] <- iter_out$strlitter_to_active_x +(iter_out$strlitter_to_active_x-(iter_out$strlitter_to_active_x/walk_rt)) # fPHYS max
       
-      p_rng[7,2] <- iter_out$k_passive_x / walk_rt # desorb min
-      p_rng[7,3] <- iter_out$k_passive_x +(iter_out$k_passive_x-(iter_out$k_passive_x/walk_rt)) # desorb max
-      
-      p_rng[8,2] <- iter_out$metlitter_to_active_x / walk_rt # fPHYS min
-      p_rng[8,3] <- iter_out$metlitter_to_active_x +(iter_out$metlitter_to_active_x-(iter_out$metlitter_to_active_x/walk_rt)) # fPHYS max
-      
-      p_rng[9,2] <- iter_out$strlitter_to_active_x / walk_rt # fPHYS min
-      p_rng[9,3] <- iter_out$strlitter_to_active_x +(iter_out$strlitter_to_active_x-(iter_out$strlitter_to_active_x/walk_rt)) # fPHYS max
-      
-      p_rng[10,2] <- iter_out$strlitter_to_slow_x / walk_rt # fPHYS min
-      p_rng[10,3] <- iter_out$strlitter_to_slow_x +(iter_out$strlitter_to_slow_x-(iter_out$strlitter_to_slow_x/walk_rt)) # fPHYS max
+      p_rng[6,2] <- iter_out$strlitter_to_slow_x / walk_rt # fPHYS min
+      p_rng[6,3] <- iter_out$strlitter_to_slow_x +(iter_out$strlitter_to_slow_x-(iter_out$strlitter_to_slow_x/walk_rt)) # fPHYS max
       
     } else {
       #update tracker for number of iterations without improvement
@@ -378,7 +378,7 @@ nbrOfWorkers()
 # Plot MCMC walk
 #######################
 
-write.csv(MCMC_out, "Century_MCMC_out_112825_100.csv")
+write.csv(MCMC_out, "Century_MCMC_out_120325_50.csv")
 
 pRMSE <- ggplot(MCMC_out, aes(x=iter, y=RMSE)) + geom_line(color="grey50", alpha=0.5) + geom_point(size=3, color="grey50", alpha=0.5)  + geom_line(data=MCMC_out %>% filter(improve > 0), color="red", linewidth=1) + geom_point(data=MCMC_out %>% filter(improve > 0), color="red", size=4) + theme_minimal() +theme(legend.position = "none")
 pr2 <- ggplot(MCMC_out, aes(x=iter, y=r2)) + geom_line(color="grey50", alpha=0.5) + geom_point(size=3, color="grey50", alpha=0.5)  + geom_line(data=MCMC_out %>% filter(improve > 0), color="red", linewidth=1) + geom_point(data=MCMC_out %>% filter(improve > 0), color="red", size=4) + theme_minimal() +theme(legend.position = "none")
@@ -399,7 +399,7 @@ MCMC_out_improved <- MCMC_out%>%filter(improve == 1) %>%mutate(cost = (RMSE/100)
 hist(MCMC_out_improved$RMSE)
 hist(MCMC_out_improved$r2)
 MCMC_SingleBest <- MCMC_out %>% filter(iter==5 & i==1) #current best
-write.csv(MCMC_SingleBest, "parameters/Century_MCMC_out_SingleBest_112625.csv")
+write.csv(MCMC_SingleBest2, "parameters/Century_MCMC_out_SingleBest_120325.csv")
 
 
 #filtering later or alternate for MCMC_out on 11/26
@@ -407,8 +407,8 @@ MCMC_out <- read.csv("Century_MCMC_out_112526.csv")
 #MCMC_out_filt3 <- MCMC_out %>% filter(w1_x>0.7, w1_x<1.5,w2_x>0.7, w2_x<1.5,t3_x>0.7, t3_x<1.5,t4_x>0.7, t4_x<1.5,k_active_x>0.7, k_active_x<1.5,k_slow_x>0.7, k_slow_x<1.5,k_passive_x>0.7, k_passive_x<1.5,
 #                                      metlitter_to_active_x>0.7, metlitter_to_active_x<1.5,strlitter_to_active_x>0.7, strlitter_to_active_x<1.5, strlitter_to_slow_x>0.7, strlitter_to_slow_x<1.5) 
 #MCMC_out_filt4 <- MCMC_out %>% filter(improve==1)
-#MCMC_SingleBest2 <- MCMC_out %>% filter(iter==295 & i==99) 
-write.csv(MCMC_SingleBest2, "parameters/Century_MCMC_out_SingleBest2_113025.csv")
+MCMC_SingleBest2 <- MCMC_out %>% filter(iter==19 & i==6) 
+write.csv(MCMC_SingleBest2, "parameters/Century_MCMC_out_SingleBest2_120325.csv")
 
 #save plot
 ggsave(file=paste0("MCMC/Output/", format(Sys.time(), "%Y%m%d_%H%M%S_"), "MIM_MCMC_pCombos-", as.character(MIM_runs),"_walk_plot", ".jpeg"), 
