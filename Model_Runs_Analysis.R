@@ -399,7 +399,7 @@ bias_plot_fun_prop <- function(xvar, xvar_name){
           plot.background = element_rect(fill = "transparent", color = "white"),
           legend.background = element_rect(fill = "transparent", color = "white"),
           panel.background = element_rect(fill = "transparent", color = "white"),
-          title = element_text(size = 10)) +  
+          title = element_text(size = 10, face = "bold")) +  
     scale_color_manual("Model", values = c("#1b9e77",  "#d95f02", "#7570b3")) +  
     scale_x_continuous(expand = c(0,0)) +
     scale_fill_manual("Model", values = c("#1b9e77",  "#d95f02", "#7570b3")) +
@@ -430,31 +430,38 @@ bias_plot_fun_prop <- function(xvar, xvar_name){
 }
 
 # Create plots with the updated function
-s1 <- bias_plot_fun_prop(Am_Ox_Al/1000, "Am_Ox_Al") +  
+s1 <- bias_plot_fun_prop(pH, "pH") +  
+  ggtitle("a) pH") 
+s2 <- bias_plot_fun_prop(Caex, "Caex") +  
+  ggtitle("b) exchangeable Ca [cmol kg-1]")
+s3 <- bias_plot_fun_prop(Clay_2um, "Clay_2um") +  
+  ggtitle("c) Clay content <2 um [%]")
+annotate_figure(  
+  ggarrange(s1, s2, s3, common.legend = TRUE,  
+            ncol = 3, nrow = 1),  
+  left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 13))
+
+ggsave("./figures/BiasPlots_Century_MIMICS_Millennial_Fitted_soil_R2_0.1+.jpeg", 
+       height = 4, width = 10)
+
+s4 <- bias_plot_fun_prop(Am_Ox_Al/1000, "Am_Ox_Al") +  
   ggtitle("a) Oxalate-extractable Al [g kg-1]") 
-s2 <- bias_plot_fun_prop(Am_Ox_Fe/1000, "Am_Ox_Fe") +  
+s5 <- bias_plot_fun_prop(Am_Ox_Fe/1000, "Am_Ox_Fe") +  
   ggtitle("b) Oxalate-extractable Fe [g kg-1]")  
-s3 <- bias_plot_fun_prop(pH, "pH") +  
-  ggtitle("c) pH")  
-s4 <- bias_plot_fun_prop(Caex, "Caex") +  
-  ggtitle("d) exchangeable Ca [cmol kg-1]")  
-s5 <- bias_plot_fun_prop(Clay_2um, "Clay_2um") +  
-  ggtitle("e) Clay content <2 um [%]")  
 s6 <- bias_plot_fun_prop(Clay_63um, "Clay_63um") +  
-  ggtitle("f) Clay + fine silt content <63 um [%]")  
+  ggtitle("c) Clay + fine silt content <63 um [%]")  
 s7 <- bias_plot_fun_prop(Clay_1_1, "Clay_1_1") +  
-  ggtitle("g) 1:1 clay minerals [%]")  
+  ggtitle("d) 1:1 clay minerals [%]")  
 s8 <- bias_plot_fun_prop(Clay_2_1, "Clay_2_1") +  
-  ggtitle("h) 2:1 clay minerals [%]")  
+  ggtitle("e) 2:1 clay minerals [%]")  
 
 # Combine plots
 annotate_figure(  
-  ggarrange(s1, s2, s3, s4, s5, s6, s7, s8, common.legend = TRUE,  
-            ncol = 4, nrow = 2),  
+  ggarrange(s4, s5, s6, s7, s8, common.legend = TRUE,  
+            ncol = 3, nrow = 2),  
   left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 13))
-
-ggsave("./figures/BiasPlots_Century_MIMICS_Millennial_Fitted_soil.jpeg", 
-       height = 6, width = 11.5)
+ggsave("./figures/BiasPlots_Century_MIMICS_Millennial_Fitted_soil_R2_0.1-.jpeg", 
+       height = 5, width = 10)
 
 # Figure for Cornell talk:
 # annotate_figure(  
