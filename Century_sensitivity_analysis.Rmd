@@ -53,16 +53,14 @@ forcing_data_Century <- forcing_data %>%
 ```{r}
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
 parameters.file <- read.table(here("parameters/soilpara_in_century.txt")) #default
-#parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA_Century.txt")) #fitted
 
 #uncomment next two code chunks for fitted
-parameters.MCMC <- read.csv("parameters/Century_MCMC_out_SingleBest_112625.csv") #MCMC fitted
-parameters.file <- parameters.file %>% 
-  mutate(V2 = case_when(
-    V1 == "w1" ~ V2*parameters.MCMC$w1_x,
-    V1 == "w2" ~ V2*parameters.MCMC$w2_x,
-    V1 == "t3" ~ V2*parameters.MCMC$t3_x,
-    V1 == "t4" ~ V2*parameters.MCMC$t4_x,
+parameters.MCMC <- read.csv("parameters/Century_MCMC_out_SingleBest_120325.csv") #MCMC fitted
+parameters.file <- parameters.file %>% mutate(V2 = case_when(
+    #V1 == "w1" ~ V2*parameters.MCMC$w1_x,
+    #V1 == "w2" ~ V2*parameters.MCMC$w2_x,
+    #V1 == "t3" ~ V2*parameters.MCMC$t3_x,
+    #V1 == "t4" ~ V2*parameters.MCMC$t4_x,
     V1 == "k_active" ~ V2*parameters.MCMC$k_active_x,
     V1 == "k_slow" ~ V2*parameters.MCMC$k_slow_x,
     V1 == "k_passive" ~ V2*parameters.MCMC$k_passive_x,

@@ -291,7 +291,7 @@ plot_pdp_fun(pdp_obs_all, "Century")
 ####################### RANDOM FOREST WITH FITTED MODEL RUNS #####################
 
 # Load fitted model runs
-fitted_run <- read.csv("model_output/all_model_results_fitted_run_2025-12-01.csv")
+fitted_run <- read.csv("model_output/all_model_results_fitted_run_2025-12-03.csv")
 
 fitted_run %>% 
   group_by(Type) %>% 
@@ -512,7 +512,7 @@ mean(sens_mimics_raw$Soil_Organic_Carbon_kg_m2)
 sens_millennial_raw <- read.csv("./model_output/Millennial_SensitivityAnalysisOutput_2025-11-18.csv") %>% 
   dplyr::filter(MAOM > 0)
 mean(sens_millennial_raw$Soil_Organic_Carbon_kg_m2)
-sens_century_raw <- read.csv("./model_output/Century_SensitivityAnalysisOutput_2025-12-01.csv") %>% 
+sens_century_raw <- read.csv("./model_output/Century_SensitivityAnalysisOutput_2025-12-11.csv") %>% 
   mutate(param_claysilt = param_claysilt*100)
 mean(sens_century_raw$Soil_Organic_Carbon_kg_m2)
 
