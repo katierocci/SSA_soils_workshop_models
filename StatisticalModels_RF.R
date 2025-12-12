@@ -797,9 +797,9 @@ vi_comparison_plot <- all_vi_comparison %>%
                 position = position_dodge(width = 0.9),
                 width = 0.2, color = "black", linewidth = 0.4) +
   facet_wrap(~model, scales = "free_x", ncol = 3) +
-  scale_fill_manual(values = c("Observed" = "#1b9e77",
-                               "Fitted" = "#d95f02",
-                               "Sensitivity" = "#7570b3"),
+  scale_fill_manual(values = c("Observed" = "#d8b365",
+                               "Fitted" = "#5ab4ac",
+                               "Sensitivity" = "#af8dc3"),
                     name = "Random forest model") +
   theme_bw(base_size = 12) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, color = "black", 
@@ -839,9 +839,9 @@ plot_pdp_all_fun <- function(pdp_data, model_name) {
     scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
                        limits = c(0,20)) +
     scale_x_continuous("Predictor range", expand = c(0,0)) +
-    scale_color_manual(values = c("Observed" = "#1b9e77",
-                                  "Fitted" = "#d95f02",
-                                  "Sensitivity" = "#7570b3"),
+    scale_color_manual(values = c("Observed" = "#d8b365",
+                                  "Fitted" = "#5ab4ac",
+                                  "Sensitivity" = "#af8dc3"),
                        name = "Random forest model")
 }
 
@@ -859,65 +859,65 @@ ggsave("./figures/RF_all_Century_pdp.jpeg",
        width = 10, height = 6)
 
 #Function to plot PDP for each model - for Cornell talk
-# p_clay <- pdp_all %>%
-#   filter(data_source != "Sensitivity") %>% 
-#   dplyr::filter(feature_name == "Clay_63um"|
-#                   feature_name == "Clay_2um") %>%
-#   mutate(feature_name = "Clay content [%]") %>%
-#   ggplot(aes(y = predicted_value, x = feature_value, color = data_source)) +
-#   geom_path(linewidth = 1) +
-#   facet_grid(~ model, labeller = labeller(model = facet_labels)) +
-#   theme_bw(base_size = 14) +
-#   theme(axis.text = element_text(color = "black"),
-#         strip.text = element_text(size = 12, face = "bold", hjust = 0),
-#         legend.position = "top",
-#         strip.background = element_rect(fill = "white", color = NA),
-#         panel.spacing.x = unit(0.5, "cm"),
-#         plot.margin = margin(r = 10, b = 10, l = 10),
-#         axis.title.y = element_blank()) +
-#   scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
-#                      limits = c(0,20)) +
-#   scale_x_continuous("Clay content [%]", expand = c(0,0), limits = c(0,100)) +
-#   scale_color_manual(values = c("Observed" = "#d8b365",
-#                                 "Fitted" = "#5ab4ac"),
-#                      name = "Random forest model")
-# 
-# p_npp <- pdp_all %>%
-#   filter(data_source != "Sensitivity") %>% 
-#   dplyr::filter(feature_name == "npp_modis.gC.m2.yr"|
-#                   feature_name == "npp_modis.gC.m2.d") %>%
-#   mutate(feature_value = ifelse(model == "MIMICS" &
-#                                   (feature_name == "npp_modis.gC.m2.yr"),
-#                                 feature_value / 365,
-#                                 feature_value),
-#          feature_name = ifelse(feature_name == "npp_modis.gC.m2.yr",
-#                                "npp_modis.gC.m2.d",
-#                                feature_name),
-#          feature_name = "NPP [g C m-2 d-1]") %>%
-#   ggplot(aes(y = predicted_value, x = feature_value, color = data_source)) +
-#   geom_path(linewidth = 1) +
-#   facet_grid(~ model) +
-#   theme_bw(base_size = 14) +
-#   theme(axis.text = element_text(color = "black"),
-#         strip.text = element_blank(),
-#         legend.position = "top",
-#         strip.background = element_blank(),
-#         panel.spacing.x = unit(0.5, "cm"),
-#         plot.margin = margin(r = 10, t = 0, l = 10, b = 10),
-#         axis.title.y = element_blank()) +
-#   scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
-#                      limits = c(0,20)) +
-#   scale_x_continuous("NPP [gC m-2 d-1]", expand = c(0,0), limits = c(0,6)) +
-#   scale_color_manual(values = c("Observed" = "#d8b365",
-#                                 "Fitted" = "#5ab4ac"),
-#                      name = "Random forest model")
-# 
-# annotate_figure(
-#   ggarrange(p_clay, p_npp, common.legend = TRUE, nrow = 2),
-#   left = text_grob("Predicted SOC stock [kg m-2]",
-#                    rot = 90, vjust = 1, hjust = 0.5))
-# ggsave("./figures/RF_Century_MIMICS_Millennial_pdp_red.jpeg",
-#        height = 5, width = 9)
+p_clay <- pdp_all %>%
+  filter(data_source != "Sensitivity") %>%
+  dplyr::filter(feature_name == "Clay_63um"|
+                  feature_name == "Clay_2um") %>%
+  mutate(feature_name = "Clay content [%]") %>%
+  ggplot(aes(y = predicted_value, x = feature_value, color = data_source)) +
+  geom_path(linewidth = 1) +
+  facet_grid(~ model, labeller = labeller(model = facet_labels)) +
+  theme_bw(base_size = 14) +
+  theme(axis.text = element_text(color = "black"),
+        strip.text = element_text(size = 12, face = "bold", hjust = 0),
+        legend.position = "top",
+        strip.background = element_rect(fill = "white", color = NA),
+        panel.spacing.x = unit(0.5, "cm"),
+        plot.margin = margin(r = 10, b = 10, l = 10),
+        axis.title.y = element_blank()) +
+  scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
+                     limits = c(0,20)) +
+  scale_x_continuous("Clay content [%]", expand = c(0,0), limits = c(0,100)) +
+  scale_color_manual(values = c("Observed" = "#d8b365",
+                                "Fitted" = "#5ab4ac"),
+                     name = "Random forest model")
+
+p_npp <- pdp_all %>%
+  filter(data_source != "Sensitivity") %>%
+  dplyr::filter(feature_name == "npp_modis.gC.m2.yr"|
+                  feature_name == "npp_modis.gC.m2.d") %>%
+  mutate(feature_value = ifelse(model == "MIMICS" &
+                                  (feature_name == "npp_modis.gC.m2.yr"),
+                                feature_value / 365,
+                                feature_value),
+         feature_name = ifelse(feature_name == "npp_modis.gC.m2.yr",
+                               "npp_modis.gC.m2.d",
+                               feature_name),
+         feature_name = "NPP [g C m-2 d-1]") %>%
+  ggplot(aes(y = predicted_value, x = feature_value, color = data_source)) +
+  geom_path(linewidth = 1) +
+  facet_grid(~ model) +
+  theme_bw(base_size = 14) +
+  theme(axis.text = element_text(color = "black"),
+        strip.text = element_blank(),
+        legend.position = "top",
+        strip.background = element_blank(),
+        panel.spacing.x = unit(0.5, "cm"),
+        plot.margin = margin(r = 10, t = 0, l = 10, b = 10),
+        axis.title.y = element_blank()) +
+  scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
+                     limits = c(0,20)) +
+  scale_x_continuous("NPP [gC m-2 d-1]", expand = c(0,0), limits = c(0,6)) +
+  scale_color_manual(values = c("Observed" = "#d8b365",
+                                "Fitted" = "#5ab4ac"),
+                     name = "Random forest model")
+
+annotate_figure(
+  ggarrange(p_clay, p_npp, common.legend = TRUE, nrow = 2),
+  left = text_grob("Predicted SOC stock [kg m-2]",
+                   rot = 90, vjust = 1, hjust = 0.5))
+ggsave("./figures/RF_Century_MIMICS_Millennial_pdp_red.jpeg",
+       height = 5, width = 9)
 
 
 
