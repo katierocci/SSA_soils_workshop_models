@@ -467,231 +467,231 @@ plot_pdp_fun(pdp_fit_all, "Century") +
                      limits = c(0,20))
 
 ####################### RANDOM FOREST WITH SENSITIVITY MODEL RUNS #####################
-
-# Define sensitivity model configurations WITH data_prep functions
-sens_model_configs <- list(
-  MIMICS = list(
-    name = "MIMICS",
-    data_prep = function(df) {
-      df %>%
-        dplyr::select(Soil_Organic_Carbon_kg_m2, ANPP, CLAY, LIG_N, TSOI, THETA_LIQ) %>%
-        setNames(c("C_stock", "npp_modis.gC.m2.yr", "Clay_2um", "LIG_N", "stemp", "sm")) %>% 
-        #REDUCE NUMBER FOR FASTER PROCESSING
-        slice_sample(n = 5000)
-    },
-    features = c("npp_modis.gC.m2.yr", "Clay_2um", "LIG_N", "stemp", "sm")
-  ),
-  Millennial = list(
-    name = "Millennial",
-    data_prep = function(df) {
-      df %>%
-        filter(MAOM > 0) %>%
-        dplyr::select(Soil_Organic_Carbon_kg_m2, forc_npp, param_claysilt, param_pH, forc_st, forc_sw) %>%
-        setNames(c("C_stock", "npp_modis.gC.m2.d", "Clay_63um", "pH", "stemp", "sm")) %>% 
-        #REDUCE NUMBER FOR FASTER PROCESSING
-        slice_sample(n = 5000) 
-    },
-    features = c("npp_modis.gC.m2.d", "Clay_63um", "pH", "stemp", "sm")
-  ),
-  Century = list(
-    name = "Century",
-    data_prep = function(df) {
-      df %>%
-        dplyr::select(Soil_Organic_Carbon_kg_m2, forc_npp, param_claysilt, LigFrac, LN, forc_st, forc_sw) %>%
-        setNames(c("C_stock", "npp_modis.gC.m2.d", "Clay_63um", "Lig_frc", "LIG_N", "stemp", "sm")) %>% 
-        #REDUCE NUMBER FOR FASTER PROCESSING
-        slice_sample(n = 5000)
-    },
-    features = c("npp_modis.gC.m2.d", "Clay_63um", "stemp", "sm", "LIG_N", "Lig_frc")
-  )
-)
-
-# Read the sensitivity files
-sens_mimics_raw <- read.csv("./model_output/MIMICS_SensitivityAnalysisOutput_2025-11-18.csv")
-mean(sens_mimics_raw$Soil_Organic_Carbon_kg_m2)
-sens_millennial_raw <- read.csv("./model_output/Millennial_SensitivityAnalysisOutput_2025-11-18.csv") %>% 
-  dplyr::filter(MAOM > 0)
-mean(sens_millennial_raw$Soil_Organic_Carbon_kg_m2)
-sens_century_raw <- read.csv("./model_output/Century_SensitivityAnalysisOutput_2025-12-11.csv") %>% 
-  mutate(param_claysilt = param_claysilt*100)
-mean(sens_century_raw$Soil_Organic_Carbon_kg_m2)
-
-# Function to train RF model on sensitivity data
-train_sens_rf_model <- function(data, model_name, features) {
-  task <- as_task_regr(x = data, target = "C_stock")
-  learner <- lrn("regr.ranger", importance = "permutation", num.trees = 1000)
-  set.seed(42)
-  resampling <- rsmp("cv", folds = 10)
-  resampling$instantiate(task)
-  rf_result <- mlr3::resample(task = task, learner = learner,
-                              resampling = resampling, store_models = TRUE)
-  # Get performance metrics
-  metrics_raw <- rf_result$aggregate(measures = msrs(c("regr.rsq", "regr.mae",
-                                                       "regr.rmse")))
-  metrics_df <- data.frame(
-    model = model_name,
-    rsq = as.numeric(metrics_raw["rsq"]),
-    mae = as.numeric(metrics_raw["regr.mae"]),
-    rmse = as.numeric(metrics_raw["regr.rmse"])
-  )
-  # Get predictions
-  rf_pred <- rf_result$prediction(predict_sets = "test")
-  pred_df <- data.frame(
-    model = model_name,
-    truth = rf_pred$truth,
-    response = rf_pred$response
-  )
-  # Get variable importance
-  vi <- lapply(rf_result$learners, function(x) x$model$variable.importance)
-  vi_df <- vi %>%
-    plyr::ldply() %>%
-    pivot_longer(everything(), names_to = "variable", values_to = "x") %>%
-    dplyr::summarise(median = median(x, na.rm = TRUE),
-                     mad = mad(x, na.rm = TRUE),
-                     .by = variable) %>%
-    dplyr::arrange(median) %>%
-    dplyr::mutate(median_pct = (abs(median) / sum(abs(median), na.rm = TRUE)) * 100,
-                  mad_pct = (mad / sum(abs(median), na.rm = TRUE)) * 100,
-                  model = model_name)
-  list(
-    metrics = metrics_df,
-    predictions = pred_df,
-    vi = vi_df,
-    model = rf_result,
-    task = task
-  )
-}
-
-# Load and train sensitivity models
-all_models_sens <- purrr::map(sens_model_configs,
-                              ~train_sens_rf_model(.$data_prep(get(paste0("sens_", 
-                                                                          tolower(.$name), "_raw"))), .$name))
-
-# Extract results
-all_metrics_sens <- map_df(all_models_sens, ~.$metrics)
-all_predictions_sens <- map_df(all_models_sens, ~.$predictions)
-all_vi_sens <- map_df(all_models_sens, ~.$vi)
-
-# Create metrics labels
-metrics_for_plot_sens <- all_metrics_sens %>%
-  mutate(
-    label = paste0("R² = ", round(rsq, 2), "\n",
-                   "MAE = ", round(mae, 2), "\n",
-                   "RMSE = ", round(rmse, 2))
-  )
-
-# Facet labels
-facet_labels_sens <- c(
-  MIMICS = "c) MIMICS",
-  Millennial = "b) Millennial",
-  Century = "a) Century"
-)
-
-# COMBINED OBSERVED VS PREDICTED PLOT
-combined_pred_plot_sens <- all_predictions_sens %>%
-  ggplot(aes(x = response, y = truth, color = model)) +
-  geom_point(size = 2, alpha = 0.6) +
-  facet_wrap(~model, labeller = labeller(model = facet_labels_sens)) +
-  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
-  geom_smooth(method = "lm", se = TRUE, alpha = 0.2) +
-  scale_color_manual(values = colors_models, guide = "none") +
-  theme_bw(base_size = 14) +
-  theme(axis.text = element_text(color = "black"),
-        strip.text = element_text(size = 12, face = "bold", hjust = 0),
-        strip.background = element_blank()) +
-  scale_y_continuous("Modeled SOC stocks [kg/m²]",
-                     limits = c(-2, 41), expand = c(0, 0)) +
-  scale_x_continuous("Predicted SOC stocks [kg/m²]",
-                     limits = c(-2, 41), expand = c(0, 0)) +
-  geom_text(data = metrics_for_plot_sens,
-            aes(x = 20, y = 8, label = label),
-            inherit.aes = FALSE,
-            vjust = "top", hjust = "left",
-            size = 3)
-
-print(combined_pred_plot_sens)
-
-# COMBINED VARIABLE IMPORTANCE PLOT 
-all_vi_normalized_sens <- all_vi_sens %>%
-  mutate(variable = case_when(
-    variable == "npp_modis.gC.m2.yr" ~ "NPP",
-    variable == "npp_modis.gC.m2.d" ~ "NPP",
-    variable == "Clay_2um" ~ "Clay",
-    variable == "Clay_63um" ~ "Clay",
-    variable == "stemp" ~ "Soil temperature",
-    variable == "sm" ~ "Soil moisture",
-    variable == "LIG_N" ~ "Lignin:N ratio",
-    variable == "Lig_frc" ~ "Lignin",
-    TRUE ~ variable
-  )) %>% 
-  group_by(model, variable) %>%
-  dplyr::summarise(across(c(median_pct, mad_pct), mean),
-                   .groups = "drop")
-
-combined_vi_plot_sens <- all_vi_normalized_sens %>%
-  ggplot(aes(x = reorder(variable, -median_pct), y = median_pct,
-             fill = model, color = model)) +
-  geom_col(position = "dodge", alpha = 0.8) +
-  geom_errorbar(aes(ymin = median_pct - mad_pct,
-                    ymax = median_pct + mad_pct),
-                position = position_dodge(width = 0.9),
-                width = 0.15, color = "black", linewidth = 0.5) +
-  scale_fill_manual(values = colors_models, name = "Model") +
-  scale_color_manual(values = colors_models, guide = "none") +
-  theme_bw(base_size = 14) +
-  theme(axis.text = element_text(color = "black"),
-        legend.position = "top") +
-  scale_x_discrete("") +
-  scale_y_continuous("Relative explained variation (%)",
-                     expand = c(0, 0), limits = c(0, 80))
-
-print(combined_vi_plot_sens)
-
-# PARTIAL DEPENDENCE PLOTS 
-# Create a function for PDP
-options(future.globals.maxSize = 6 * 1024^3) 
-create_pdp_sens <- function(model_list, model_name, config, data) {
-  task_pdp <- as_task_regr(x = config$data_prep(data),
-                           target = "C_stock")
-  
-  learner_pdp <- lrn("regr.ranger", importance = "permutation", num.trees = 1000)
-  set.seed(42)
-  learner_pdp$train(task_pdp)
-  
-  model_rf <- Predictor$new(learner_pdp,
-                            data = config$data_prep(data))
-  
-  effect_pdp <- FeatureEffects$new(model_rf, method = "pdp",
-                                   features = config$features)
-  return(effect_pdp)
-}
-
-# Run PDP function
-pdp_results_sens <- purrr::map2(
-  seq_along(sens_model_configs),
-  names(sens_model_configs),
-  ~create_pdp_sens(all_models_sens[[.y]], .y, sens_model_configs[[.y]], 
-                   get(paste0("sens_", tolower(.y), "_raw")))
-)
-
-# Extract PDP data
-pdp_sens_all <- extract_pdp_data(pdp_results_sens, names(sens_model_configs)) %>% 
-  mutate(data_source = "Sensitivity")
-
-head(pdp_sens_all)
-
-# Plot PDP's
-plot_pdp_fun(pdp_sens_all, "MIMICS") +
-  scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
-                     limits = c(0,15))
-
-plot_pdp_fun(pdp_sens_all, "Millennial") +
-  scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
-                     limits = c(0,15))
-
-plot_pdp_fun(pdp_sens_all, "Century") +
-  scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
-                     limits = c(0,15))
+# 
+# # Define sensitivity model configurations WITH data_prep functions
+# sens_model_configs <- list(
+#   MIMICS = list(
+#     name = "MIMICS",
+#     data_prep = function(df) {
+#       df %>%
+#         dplyr::select(Soil_Organic_Carbon_kg_m2, ANPP, CLAY, LIG_N, TSOI, THETA_LIQ) %>%
+#         setNames(c("C_stock", "npp_modis.gC.m2.yr", "Clay_2um", "LIG_N", "stemp", "sm")) %>% 
+#         #REDUCE NUMBER FOR FASTER PROCESSING
+#         slice_sample(n = 5000)
+#     },
+#     features = c("npp_modis.gC.m2.yr", "Clay_2um", "LIG_N", "stemp", "sm")
+#   ),
+#   Millennial = list(
+#     name = "Millennial",
+#     data_prep = function(df) {
+#       df %>%
+#         filter(MAOM > 0) %>%
+#         dplyr::select(Soil_Organic_Carbon_kg_m2, forc_npp, param_claysilt, param_pH, forc_st, forc_sw) %>%
+#         setNames(c("C_stock", "npp_modis.gC.m2.d", "Clay_63um", "pH", "stemp", "sm")) %>% 
+#         #REDUCE NUMBER FOR FASTER PROCESSING
+#         slice_sample(n = 5000) 
+#     },
+#     features = c("npp_modis.gC.m2.d", "Clay_63um", "pH", "stemp", "sm")
+#   ),
+#   Century = list(
+#     name = "Century",
+#     data_prep = function(df) {
+#       df %>%
+#         dplyr::select(Soil_Organic_Carbon_kg_m2, forc_npp, param_claysilt, LigFrac, LN, forc_st, forc_sw) %>%
+#         setNames(c("C_stock", "npp_modis.gC.m2.d", "Clay_63um", "Lig_frc", "LIG_N", "stemp", "sm")) %>% 
+#         #REDUCE NUMBER FOR FASTER PROCESSING
+#         slice_sample(n = 5000)
+#     },
+#     features = c("npp_modis.gC.m2.d", "Clay_63um", "stemp", "sm", "LIG_N", "Lig_frc")
+#   )
+# )
+# 
+# # Read the sensitivity files
+# sens_mimics_raw <- read.csv("./model_output/MIMICS_SensitivityAnalysisOutput_2025-11-18.csv")
+# mean(sens_mimics_raw$Soil_Organic_Carbon_kg_m2)
+# sens_millennial_raw <- read.csv("./model_output/Millennial_SensitivityAnalysisOutput_2025-11-18.csv") %>% 
+#   dplyr::filter(MAOM > 0)
+# mean(sens_millennial_raw$Soil_Organic_Carbon_kg_m2)
+# sens_century_raw <- read.csv("./model_output/Century_SensitivityAnalysisOutput_2025-12-11.csv") %>% 
+#   mutate(param_claysilt = param_claysilt*100)
+# mean(sens_century_raw$Soil_Organic_Carbon_kg_m2)
+# 
+# # Function to train RF model on sensitivity data
+# train_sens_rf_model <- function(data, model_name, features) {
+#   task <- as_task_regr(x = data, target = "C_stock")
+#   learner <- lrn("regr.ranger", importance = "permutation", num.trees = 1000)
+#   set.seed(42)
+#   resampling <- rsmp("cv", folds = 10)
+#   resampling$instantiate(task)
+#   rf_result <- mlr3::resample(task = task, learner = learner,
+#                               resampling = resampling, store_models = TRUE)
+#   # Get performance metrics
+#   metrics_raw <- rf_result$aggregate(measures = msrs(c("regr.rsq", "regr.mae",
+#                                                        "regr.rmse")))
+#   metrics_df <- data.frame(
+#     model = model_name,
+#     rsq = as.numeric(metrics_raw["rsq"]),
+#     mae = as.numeric(metrics_raw["regr.mae"]),
+#     rmse = as.numeric(metrics_raw["regr.rmse"])
+#   )
+#   # Get predictions
+#   rf_pred <- rf_result$prediction(predict_sets = "test")
+#   pred_df <- data.frame(
+#     model = model_name,
+#     truth = rf_pred$truth,
+#     response = rf_pred$response
+#   )
+#   # Get variable importance
+#   vi <- lapply(rf_result$learners, function(x) x$model$variable.importance)
+#   vi_df <- vi %>%
+#     plyr::ldply() %>%
+#     pivot_longer(everything(), names_to = "variable", values_to = "x") %>%
+#     dplyr::summarise(median = median(x, na.rm = TRUE),
+#                      mad = mad(x, na.rm = TRUE),
+#                      .by = variable) %>%
+#     dplyr::arrange(median) %>%
+#     dplyr::mutate(median_pct = (abs(median) / sum(abs(median), na.rm = TRUE)) * 100,
+#                   mad_pct = (mad / sum(abs(median), na.rm = TRUE)) * 100,
+#                   model = model_name)
+#   list(
+#     metrics = metrics_df,
+#     predictions = pred_df,
+#     vi = vi_df,
+#     model = rf_result,
+#     task = task
+#   )
+# }
+# 
+# # Load and train sensitivity models
+# all_models_sens <- purrr::map(sens_model_configs,
+#                               ~train_sens_rf_model(.$data_prep(get(paste0("sens_", 
+#                                                                           tolower(.$name), "_raw"))), .$name))
+# 
+# # Extract results
+# all_metrics_sens <- map_df(all_models_sens, ~.$metrics)
+# all_predictions_sens <- map_df(all_models_sens, ~.$predictions)
+# all_vi_sens <- map_df(all_models_sens, ~.$vi)
+# 
+# # Create metrics labels
+# metrics_for_plot_sens <- all_metrics_sens %>%
+#   mutate(
+#     label = paste0("R² = ", round(rsq, 2), "\n",
+#                    "MAE = ", round(mae, 2), "\n",
+#                    "RMSE = ", round(rmse, 2))
+#   )
+# 
+# # Facet labels
+# facet_labels_sens <- c(
+#   MIMICS = "c) MIMICS",
+#   Millennial = "b) Millennial",
+#   Century = "a) Century"
+# )
+# 
+# # COMBINED OBSERVED VS PREDICTED PLOT
+# combined_pred_plot_sens <- all_predictions_sens %>%
+#   ggplot(aes(x = response, y = truth, color = model)) +
+#   geom_point(size = 2, alpha = 0.6) +
+#   facet_wrap(~model, labeller = labeller(model = facet_labels_sens)) +
+#   geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+#   geom_smooth(method = "lm", se = TRUE, alpha = 0.2) +
+#   scale_color_manual(values = colors_models, guide = "none") +
+#   theme_bw(base_size = 14) +
+#   theme(axis.text = element_text(color = "black"),
+#         strip.text = element_text(size = 12, face = "bold", hjust = 0),
+#         strip.background = element_blank()) +
+#   scale_y_continuous("Modeled SOC stocks [kg/m²]",
+#                      limits = c(-2, 41), expand = c(0, 0)) +
+#   scale_x_continuous("Predicted SOC stocks [kg/m²]",
+#                      limits = c(-2, 41), expand = c(0, 0)) +
+#   geom_text(data = metrics_for_plot_sens,
+#             aes(x = 20, y = 8, label = label),
+#             inherit.aes = FALSE,
+#             vjust = "top", hjust = "left",
+#             size = 3)
+# 
+# print(combined_pred_plot_sens)
+# 
+# # COMBINED VARIABLE IMPORTANCE PLOT 
+# all_vi_normalized_sens <- all_vi_sens %>%
+#   mutate(variable = case_when(
+#     variable == "npp_modis.gC.m2.yr" ~ "NPP",
+#     variable == "npp_modis.gC.m2.d" ~ "NPP",
+#     variable == "Clay_2um" ~ "Clay",
+#     variable == "Clay_63um" ~ "Clay",
+#     variable == "stemp" ~ "Soil temperature",
+#     variable == "sm" ~ "Soil moisture",
+#     variable == "LIG_N" ~ "Lignin:N ratio",
+#     variable == "Lig_frc" ~ "Lignin",
+#     TRUE ~ variable
+#   )) %>% 
+#   group_by(model, variable) %>%
+#   dplyr::summarise(across(c(median_pct, mad_pct), mean),
+#                    .groups = "drop")
+# 
+# combined_vi_plot_sens <- all_vi_normalized_sens %>%
+#   ggplot(aes(x = reorder(variable, -median_pct), y = median_pct,
+#              fill = model, color = model)) +
+#   geom_col(position = "dodge", alpha = 0.8) +
+#   geom_errorbar(aes(ymin = median_pct - mad_pct,
+#                     ymax = median_pct + mad_pct),
+#                 position = position_dodge(width = 0.9),
+#                 width = 0.15, color = "black", linewidth = 0.5) +
+#   scale_fill_manual(values = colors_models, name = "Model") +
+#   scale_color_manual(values = colors_models, guide = "none") +
+#   theme_bw(base_size = 14) +
+#   theme(axis.text = element_text(color = "black"),
+#         legend.position = "top") +
+#   scale_x_discrete("") +
+#   scale_y_continuous("Relative explained variation (%)",
+#                      expand = c(0, 0), limits = c(0, 80))
+# 
+# print(combined_vi_plot_sens)
+# 
+# # PARTIAL DEPENDENCE PLOTS 
+# # Create a function for PDP
+# options(future.globals.maxSize = 6 * 1024^3) 
+# create_pdp_sens <- function(model_list, model_name, config, data) {
+#   task_pdp <- as_task_regr(x = config$data_prep(data),
+#                            target = "C_stock")
+#   
+#   learner_pdp <- lrn("regr.ranger", importance = "permutation", num.trees = 1000)
+#   set.seed(42)
+#   learner_pdp$train(task_pdp)
+#   
+#   model_rf <- Predictor$new(learner_pdp,
+#                             data = config$data_prep(data))
+#   
+#   effect_pdp <- FeatureEffects$new(model_rf, method = "pdp",
+#                                    features = config$features)
+#   return(effect_pdp)
+# }
+# 
+# # Run PDP function
+# pdp_results_sens <- purrr::map2(
+#   seq_along(sens_model_configs),
+#   names(sens_model_configs),
+#   ~create_pdp_sens(all_models_sens[[.y]], .y, sens_model_configs[[.y]], 
+#                    get(paste0("sens_", tolower(.y), "_raw")))
+# )
+# 
+# # Extract PDP data
+# pdp_sens_all <- extract_pdp_data(pdp_results_sens, names(sens_model_configs)) %>% 
+#   mutate(data_source = "Sensitivity")
+# 
+# head(pdp_sens_all)
+# 
+# # Plot PDP's
+# plot_pdp_fun(pdp_sens_all, "MIMICS") +
+#   scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
+#                      limits = c(0,15))
+# 
+# plot_pdp_fun(pdp_sens_all, "Millennial") +
+#   scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
+#                      limits = c(0,15))
+# 
+# plot_pdp_fun(pdp_sens_all, "Century") +
+#   scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
+#                      limits = c(0,15))
 
 ####################### COMPARE PROCESS-BASED MODELS ACROSS RF APPROACHES #######################
 
@@ -700,27 +700,28 @@ all_predictions_combined <- bind_rows(
   all_predictions %>% 
     mutate(data_source = "Observed"),
   all_predictions_fitted %>% 
-    mutate(data_source = "Fitted"),
-  all_predictions_sens %>% 
-    mutate(data_source = "Sensitivity")
+    mutate(data_source = "Fitted")
+  # all_predictions_sens %>% 
+  #   mutate(data_source = "Sensitivity")
 )
 
 # Create mapping for model names
 model_order <- c("Century", "Millennial", "MIMICS")
-source_order <- c("Observed", "Fitted", "Sensitivity")
+# source_order <- c("Observed", "Fitted", "Sensitivity")
+source_order <- c("Observed", "Fitted")
 
 # Define facet labels columns (data sources)
 facet_labels_sources <- c(
-  Observed = "Observed Data",
-  Fitted = "Fitted Model Runs",
-  Sensitivity = "Sensitivity Analysis"
+  Observed = "Observed AfSIS data",
+  Fitted = "Modeled AfSIS data"
+  # Sensitivity = "Sensitivity Analysis"
 )
 
 # Combine all metrics
 all_metrics_comparison <- bind_rows(
   all_metrics %>% mutate(data_source = "Observed"),
-  all_metrics_fitted %>% mutate(data_source = "Fitted"),
-  all_metrics_sens %>% mutate(data_source = "Sensitivity")
+  all_metrics_fitted %>% mutate(data_source = "Fitted")
+  # all_metrics_sens %>% mutate(data_source = "Sensitivity")
 )
 
 # Prepare metrics for annotation
@@ -767,9 +768,26 @@ all_vi_comparison <- bind_rows(
   all_vi %>%
     mutate(data_source = "Observed"),
   all_vi_fitted %>%
-    mutate(data_source = "Fitted"),
-  all_vi_sens %>%
-    mutate(data_source = "Sensitivity")) 
+    mutate(data_source = "Fitted")
+  # all_vi_sens %>%
+  #   mutate(data_source = "Sensitivity")
+  ) 
+
+# Calculate difference in VI between observed and fitted for each model and each variable
+median_pct_diff <- all_vi_comparison %>%
+  pivot_wider(
+    id_cols = c(variable, model),
+    names_from = data_source,
+    values_from = median_pct
+  ) %>%
+  mutate(median_pct_diff = abs(Fitted - Observed)) %>%
+  select(variable, model, Observed, Fitted, median_pct_diff)
+
+median_pct_diff
+
+median_pct_diff %>% 
+  dplyr::group_by(model) %>%
+  dplyr::summarise(total_median_pct_diff = sum(median_pct_diff))
 
 # Create variable label mapping
 variable_labels <- c(
@@ -782,6 +800,13 @@ variable_labels <- c(
   "LIG_N" = "Lignin:N ratio",
   "Lig_frc" = "Lignin [%]",
   "pH" = "pH"
+)
+
+# Define facet labels (model names)
+facet_labels_models <- c(
+  Century = "a) Century predictors",
+  Millennial = "b) Millennial predictors",
+  MIMICS = "c) MIMICS predictors"
 )
   
 # Create the plot
@@ -796,12 +821,13 @@ vi_comparison_plot <- all_vi_comparison %>%
                     ymax = median_pct + mad_pct),
                 position = position_dodge(width = 0.9),
                 width = 0.2, color = "black", linewidth = 0.4) +
-  facet_wrap(~model, scales = "free_x", ncol = 3) +
+  facet_wrap(~model, scales = "free_x", ncol = 3,
+             labeller = labeller(model = facet_labels_models)) +
   scale_fill_manual(values = c("Observed" = "#d8b365",
-                               "Fitted" = "#5ab4ac",
-                               "Sensitivity" = "#af8dc3"),
-                    name = "Random forest model") +
-  theme_bw(base_size = 12) +
+                               "Fitted" = "#5ab4ac"),
+                    name = "Random forest model trained on: ",
+                    labels = c("observed AfSIS data", "modeled AfSIS data")) +
+  theme_bw(base_size = 15) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, color = "black", 
                                    size = 10),
         axis.text.y = element_text(color = "black"),
@@ -810,19 +836,27 @@ vi_comparison_plot <- all_vi_comparison %>%
         legend.position = "top",
         panel.spacing.x = unit(0.8, "lines")) +
   scale_y_continuous("Relative explained variation (%)",
-                     expand = c(0, 0), limits = c(0, 65)) +
+                     expand = c(0, 0), limits = c(0, 55)) +
   scale_x_discrete("")
 
 print(vi_comparison_plot)
 ggsave("./figures/all_RF_models_vi_comparison.jpeg",
-       vi_comparison_plot, width = 11, height = 5)
+       vi_comparison_plot, width = 11, height = 6)
 
 # Create PDP plots comparing the three RF approaches for each model
 
-pdp_all <- rbind(pdp_obs_all, pdp_fit_all, pdp_sens_all)
+pdp_all <- rbind(
+  pdp_obs_all, 
+  pdp_fit_all 
+  # pdp_sens_all
+)
 
-pdp_all$data_source <- factor(pdp_all$data_source, levels = c("Observed", 
-                                                              "Fitted", "Sensitivity"),
+pdp_all$data_source <- factor(pdp_all$data_source, 
+                              levels = c(
+                                "Observed", 
+                                "Fitted" 
+                                # "Sensitivity"
+                                ),
                               ordered = TRUE)
 
 #Function to plot PDP for each model
@@ -840,8 +874,9 @@ plot_pdp_all_fun <- function(pdp_data, model_name) {
                        limits = c(0,20)) +
     scale_x_continuous("Predictor range", expand = c(0,0)) +
     scale_color_manual(values = c("Observed" = "#d8b365",
-                                  "Fitted" = "#5ab4ac",
-                                  "Sensitivity" = "#af8dc3"),
+                                  "Fitted" = "#5ab4ac"
+                                  # "Sensitivity" = "#af8dc3"
+                                  ),
                        name = "Random forest model")
 }
 
@@ -860,13 +895,13 @@ ggsave("./figures/RF_all_Century_pdp.jpeg",
 
 #Function to plot PDP for each model - for Cornell talk
 p_clay <- pdp_all %>%
-  filter(data_source != "Sensitivity") %>%
+  # filter(data_source != "Sensitivity") %>%
   dplyr::filter(feature_name == "Clay_63um"|
                   feature_name == "Clay_2um") %>%
   mutate(feature_name = "Clay content [%]") %>%
   ggplot(aes(y = predicted_value, x = feature_value, color = data_source)) +
   geom_path(linewidth = 1) +
-  facet_grid(~ model, labeller = labeller(model = facet_labels)) +
+  facet_grid(~ model, labeller = labeller(model = facet_labels_models)) +
   theme_bw(base_size = 14) +
   theme(axis.text = element_text(color = "black"),
         strip.text = element_text(size = 12, face = "bold", hjust = 0),
@@ -880,10 +915,11 @@ p_clay <- pdp_all %>%
   scale_x_continuous("Clay content [%]", expand = c(0,0), limits = c(0,100)) +
   scale_color_manual(values = c("Observed" = "#d8b365",
                                 "Fitted" = "#5ab4ac"),
-                     name = "Random forest model")
+                     name = "Random forest model trained on: ",
+                     labels = c("observed AfSIS data", "modeled AfSIS data"))
 
 p_npp <- pdp_all %>%
-  filter(data_source != "Sensitivity") %>%
+  # filter(data_source != "Sensitivity") %>%
   dplyr::filter(feature_name == "npp_modis.gC.m2.yr"|
                   feature_name == "npp_modis.gC.m2.d") %>%
   mutate(feature_value = ifelse(model == "MIMICS" &
@@ -910,14 +946,15 @@ p_npp <- pdp_all %>%
   scale_x_continuous("NPP [gC m-2 d-1]", expand = c(0,0), limits = c(0,6)) +
   scale_color_manual(values = c("Observed" = "#d8b365",
                                 "Fitted" = "#5ab4ac"),
-                     name = "Random forest model")
+                     name = "Random forest model trained on: ",
+                     labels = c("observed AfSIS data", "modeled AfSIS data"))
 
 annotate_figure(
-  ggarrange(p_clay, p_npp, common.legend = TRUE, nrow = 2),
+  ggarrange(p_clay, p_npp, common.legend = TRUE, nrow = 2, heights = c(1.1,1)),
   left = text_grob("Predicted SOC stock [kg m-2]",
                    rot = 90, vjust = 1, hjust = 0.5))
 ggsave("./figures/RF_Century_MIMICS_Millennial_pdp_red.jpeg",
-       height = 5, width = 9)
+       height = 6, width = 9)
 
 
 
