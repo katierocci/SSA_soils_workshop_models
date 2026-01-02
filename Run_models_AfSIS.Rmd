@@ -100,8 +100,7 @@ forcing_data_Century <- forcing_data %>%
 #Run Century at AfSIS sites (after Abramoff et al. 2021)
 ```{r}
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
-parameters.file <- read.table(here("parameters/soilpara_in_century.txt")) #default
-#parameters.file <- read.table(here("parameters/soilpara_in_fit_SSA_Century.txt")) #fitted
+# parameters.file <- read.table(here("parameters/soilpara_in_century.txt")) #default
 
 #uncomment next two code chunks for fitted
 parameters.MCMC <- read.csv("parameters/Century_MCMC_out_SingleBest_120325.csv") #MCMC fitted
@@ -184,7 +183,7 @@ hist(Century_ss_AllSites$Soil_Organic_Carbon_kg_m2)
 source(here("parameters/MIMICS_parameters_sandbox_20231129.R"))
 
 #IF using parameterized MIMICS uncomment lines of code preceding model run
-MCMC_SingleBest <- read.csv('AfSIS_MIMICS_MCMC_Parameterized.csv')
+MCMC_SingleBest <- read.csv("parameters/AfSIS_MIMICS_MCMC_Parameterized.csv")
 Tau_MULT <<- Tau_MULT*MCMC_SingleBest$Tau_x
 desorb_MULT <<- desorb_MULT*MCMC_SingleBest$desorb_x
 fPHYS_MULT <<- fPHYS_MULT*MCMC_SingleBest$fPHYS_x
