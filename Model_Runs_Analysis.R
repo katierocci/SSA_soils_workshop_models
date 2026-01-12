@@ -14,7 +14,7 @@ fitted_run <- read.csv("model_output/all_model_results_fitted_run_2025-12-03.csv
 ## Load AfSIS data
 afsis_data <- read.csv("forcing_data/afsis_ref_updated9.csv", as.is = T) 
 
-# Check data range for AfSIS data (used in this study)
+## Check data range for AfSIS data (used in this study)
 facet_labels <- c(
   Clay_2um = "a) Clay content < 2 um [%]",
   Clay_63um = "b) Clay content < 63 um [%]",
@@ -129,10 +129,10 @@ both_runs_obs %>%
         panel.background = element_rect(fill = "transparent", color = "white"),
        legend.background = element_rect(fill = "transparent", color = "white"),
        legend.position = "top") +
-  scale_y_continuous("Observed SOC stocks [kg m-2]", limits = c(NA,24),
+  scale_y_continuous(expression("Observed SOC stocks [kg m" ^-2*"]"), limits = c(NA,24),
                      expand = c(0,0)) +
   coord_cartesian(ylim = c(0,24)) +
-  scale_x_continuous("Modeled SOC stocks [kg m-2]", limits = c(0,41),
+  scale_x_continuous(expression("Modeled SOC stocks [kg m"^-2*"]"), limits = c(0,41),
                      expand = c(0,0)) +
   scale_color_manual("Model run", values = c("#f03b20", "#feb24c")) +
   scale_fill_manual("Model run", values = c("#f03b20", "#feb24c")) +
@@ -234,7 +234,7 @@ bias_plot_fun_forc <- function(xvar, xvar_name, model){
       aes(x = Inf, y = 30, label = label),
       color = "#f03b20",
       inherit.aes = FALSE,
-      size = 2.5,
+      size = 3,
       hjust = 3.0
     ) +
     geom_text(
@@ -242,7 +242,7 @@ bias_plot_fun_forc <- function(xvar, xvar_name, model){
       aes(x = Inf, y = 30, label = label),
       color = "#feb24c",
       inherit.aes = FALSE,
-      size = 2.5,
+      size = 3,
       hjust = 1.8
     )
 }
@@ -276,7 +276,8 @@ f6_cen <- bias_plot_fun_forc(model = "Century", xvar = LIG_N,
 annotate_figure(  
   ggarrange(f1_cen, f2_cen, f3_cen, f4_cen, f5_cen, f6_cen,
             common.legend = TRUE, nrow = 2, ncol = 3),  
-  left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 13))
+  left = text_grob(expression("Bias in SOC stocks [kg m"^-2*"]"), 
+                   rot = 90, size = 13))
 
 ggsave("./figures/BiasPlots_Century_DefaultFitted_forc.jpeg", 
        height = 5, width = 9) 
@@ -305,7 +306,8 @@ f5_mil <- bias_plot_fun_forc(model = "Millennial", xvar = pH,
 # Combine plots
 annotate_figure(  
   ggarrange(f1_mil, f2_mil, f3_mil, f4_mil, f5_mil, common.legend = TRUE),  
-  left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 13))
+  left = text_grob(expression("Bias in SOC stocks [kg m"^-2*"]"), 
+                   rot = 90, size = 13))
 
 ggsave("./figures/BiasPlots_Millennial_DefaultFitted_forc.jpeg", 
        height = 5, width = 9) 
@@ -334,7 +336,8 @@ f5_mic <- bias_plot_fun_forc(model = "MIMICS", xvar = LIG_N,
 # Combine plots
 annotate_figure(  
   ggarrange(f1_mic, f2_mic, f3_mic, f4_mic, f5_mic, common.legend = TRUE),  
-  left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 13))
+  left = text_grob(expression("Bias in SOC stocks [kg m"^-2*"]"), 
+                   rot = 90, size = 13))
 
 ggsave("./figures/BiasPlots_MIMICS_DefaultFitted_forc.jpeg", 
        height = 5, width = 9) 
@@ -357,11 +360,15 @@ extract_bias_prop_lm_stats <- function(df, xvar_name, type_filter) {
   # p-value of slope (coefficient on x variable)
   p_value <- coef(summary_lm)[2, "Pr(>|t|)"]
   
+  # Extract slope
+  slope <- coef(summary_lm)[2, "Estimate"]
+  
   tibble(
     Type = type_filter,
     adj_r_squared = summary_lm$adj.r.squared,
     p_value = p_value,
-    rmse = rmse
+    rmse = rmse,
+    slope = slope
   )
 }
 
@@ -399,7 +406,8 @@ bias_plot_fun_prop <- function(xvar, xvar_name){
           plot.background = element_rect(fill = "transparent", color = "white"),
           legend.background = element_rect(fill = "transparent", color = "white"),
           panel.background = element_rect(fill = "transparent", color = "white"),
-          title = element_text(size = 10, face = "bold")) +  
+          title = element_text(size = 10),
+          panel.grid.major = element_line(color = "grey", linewidth = 0.1)) +  
     scale_color_manual("Model", values = c("#1b9e77",  "#d95f02", "#7570b3")) +  
     scale_x_continuous(expand = c(0,0)) +
     scale_fill_manual("Model", values = c("#1b9e77",  "#d95f02", "#7570b3")) +
@@ -408,38 +416,39 @@ bias_plot_fun_prop <- function(xvar, xvar_name){
       aes(x = Inf, y = 25, label = label), 
       color = "#1b9e77",
       inherit.aes = FALSE,
-      size = 2.5,
-      hjust = 3.5
+      size = 3.3,
+      hjust = 3.3
     ) +
     geom_text(
       data = stats_table %>% filter(Type == "Millennial"),
       aes(x = Inf, y = 25, label = label), 
       color = "#d95f02",
       inherit.aes = FALSE,
-      size = 2.5,
-      hjust = 2.4
+      size = 3.3,
+      hjust = 2.15
     ) +
     geom_text(
       data = stats_table %>% filter(Type == "MIMICS"),
       aes(x = Inf, y = 25, label = label), 
       color = "#7570b3",
       inherit.aes = FALSE,
-      size = 2.5,
-      hjust = 1.1
+      size = 3.3,
+      hjust = 1
     )
 }
 
 # Create plots with the updated function
 s1 <- bias_plot_fun_prop(pH, "pH") +  
-  ggtitle("a) pH") 
+  ggtitle("a) soil pH") 
 s2 <- bias_plot_fun_prop(Caex, "Caex") +  
-  ggtitle("b) exchangeable Ca [cmol kg-1]")
+  ggtitle(expression("b) exchangeable Ca [cmol kg"^-1*"]"))
 s3 <- bias_plot_fun_prop(Clay_2um, "Clay_2um") +  
   ggtitle("c) Clay content <2 um [%]")
 annotate_figure(  
   ggarrange(s1, s2, s3, common.legend = TRUE,  
             ncol = 3, nrow = 1),  
-  left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 13))
+  left = text_grob(expression("Bias in SOC stocks [kg m"^-2*"]"), 
+                   rot = 90, size = 13))
 
 ggsave("./figures/BiasPlots_Century_MIMICS_Millennial_Fitted_soil_R2_0.1+.jpeg", 
        height = 4, width = 10)
@@ -459,11 +468,11 @@ s8 <- bias_plot_fun_prop(Clay_2_1, "Clay_2_1") +
 annotate_figure(  
   ggarrange(s4, s5, s6, s7, s8, common.legend = TRUE,  
             ncol = 3, nrow = 2),  
-  left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 13))
+  left = text_grob(expression("Bias in SOC stocks [kg m"^-2*"]"), 
+                   rot = 90, size = 13))
 ggsave("./figures/BiasPlots_Century_MIMICS_Millennial_Fitted_soil_R2_0.1-.jpeg", 
-       height = 5, width = 10)
+       height = 6, width = 10)
 
-# Figure for Cornell talk:
 # annotate_figure(  
 #   ggarrange(s4, s5, s7, s8, common.legend = TRUE,  
 #             ncol = 4, nrow = 1),  
@@ -484,4 +493,4 @@ annotate_figure(
   left = text_grob("Bias in SOC stocks [kg m-2]", rot = 90, size = 12))
 
 ggsave("./figures/BiasPlots_Century_MIMICS_Millennial_Fitted_long_lat.jpeg", 
-       height = 5, width = 9) 
+       height = 5, width = 10)

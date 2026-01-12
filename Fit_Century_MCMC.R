@@ -10,13 +10,12 @@
 #load libraries needed outside of model code
 ################################################
 library(tidyr)
-library(dplyr)
-library(caret)
 library(here)
-library(rootSolve)
 library(parallel)
 library(future)
 library(gridExtra)
+library(caret)
+library(rootSolve)
 
 ########################################
 # Load forcing data
@@ -26,23 +25,23 @@ afsis_data <- read.csv("forcing_data/afsis_ref_updated9.csv", as.is=T)
 ## Prepare forcing data
 forcing_data <- afsis_data %>% 
   tibble::rowid_to_column("Set") %>% 
-  filter(Depth == 'Topsoil') %>% 
-  filter(CORG <= 20)
+  dplyr::filter(Depth == 'Topsoil') %>% 
+  dplyr::filter(CORG <= 20)
 
 data <- forcing_data %>%
   drop_na(Litterfall.gC.m2.yr, NPP.gC.m2.d, Clay_2um, Clay_63um, stemp, 
           sm, pH, bd_extracted, LIG_N) %>%
-  mutate(npp_modis.gC.m2.d = npp_modis*1000/365, #Century units now same as Millennial
-         param_claysilt = Clay_63um/100, #fraction in Century
-         forc_st = stemp, 
-         forc_sw = sm, 
-         forc_npp = npp_modis.gC.m2.d,
-         LN = LIG_N, 
-         LigFrac = LIG/100,
-         SOC = CORG*10*bd_extracted*20/100,
-         input_to_metlitter = 0.85 - 0.013 * LN,
-         X=SSN,
-         site_id = row_number()) %>%
+  dplyr::mutate(npp_modis.gC.m2.d = npp_modis*1000/365, #Century units now same as Millennial
+                param_claysilt = Clay_63um/100, #fraction in Century
+                forc_st = stemp, 
+                forc_sw = sm, 
+                forc_npp = npp_modis.gC.m2.d,
+                LN = LIG_N, 
+                LigFrac = LIG/100,
+                SOC = CORG*10*bd_extracted*20/100,
+                input_to_metlitter = 0.85 - 0.013 * LN,
+                X = SSN,
+                site_id = row_number()) %>%
   dplyr::select(X, forc_st, forc_sw, forc_npp, LN, param_claysilt, LigFrac, 
                 SOC, input_to_metlitter, site_id)
 

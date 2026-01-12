@@ -7,18 +7,8 @@ authors: "Soil-climate feedback across sub-Saharan Africa Workshop Participants"
 
 #Load libraries needed to run MIMICS and Millennial
 ```{r}
-library(FME)
-library(here)
 library(tidyverse)
-library(viridis)
-library(DT)
-library(purrr)
-library(Metrics)
-library(SoilR)
-
-# safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
-#                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888",
-#                              "#E69F00", "#D55E00")
+library(here)
 
 #load mimics model components
 source(here("ODEs/RXEQ.R"))
@@ -47,19 +37,19 @@ forcing_data <- afsis_data %>%
 
 # match MIMICS names
 forcing_data_MIMICS <- forcing_data %>% 
-  mutate(npp_modis.gC.m2.yr = npp_modis*1000) %>%
+  dplyr::mutate(npp_modis.gC.m2.yr = npp_modis*1000) %>%
   drop_na(npp_modis.gC.m2.yr, pH, Clay_2um, LIG_N, stemp, sm, Clay_63um, bd_extracted,
           Litterfall.gC.m2.yr) %>%
-  select(Set, SSN, ANPP = npp_modis.gC.m2.yr, 
-         CLAY = Clay_2um,
-         lig_N = LIG_N,
-         TSOI = stemp,
-         theta_liq = sm,
-         Depth = Depth)
+  dplyr::select(Set, SSN, ANPP = npp_modis.gC.m2.yr, 
+                CLAY = Clay_2um,
+                lig_N = LIG_N,
+                TSOI = stemp,
+                theta_liq = sm,
+                Depth = Depth)
 
 # match Millennial names
 forcing_data_Millennial <- forcing_data %>% 
-  mutate(npp_modis.gC.m2.d = npp_modis*1000/365) %>%
+  dplyr::mutate(npp_modis.gC.m2.d = npp_modis*1000/365) %>%
   drop_na(npp_modis.gC.m2.d, pH, Clay_2um, LIG_N, stemp, sm, Clay_63um, bd_extracted,
           Litterfall.gC.m2.yr) %>%
   dplyr::select(Set, param_pH = pH, 
@@ -72,9 +62,9 @@ forcing_data_Millennial <- forcing_data %>%
                 Longitude = Longitude,
                 SSN = SSN,
                 Depth = Depth) %>% 
-  mutate(param_bulkd = param_bulkd*1000*0.2, 
-         param_pc = 0.86, #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
-         site_id = row_number()) 
+  dplyr::mutate(param_bulkd = param_bulkd*1000*0.2, 
+                param_pc = 0.86, #1000 converts from g/cm3 to kg/m3, 0.2 for top 20 cm
+                site_id = row_number()) 
 
 # Forcing data Century
 # https://search.r-project.org/CRAN/refmans/SoilR/html/CenturyModel.html
@@ -82,16 +72,16 @@ forcing_data_Millennial <- forcing_data %>%
 forcing_data_Century <- forcing_data %>%
   drop_na(Litterfall.gC.m2.yr, NPP.gC.m2.d, Clay_2um, Clay_63um, stemp, 
           sm, pH, bd_extracted, LIG_N) %>%
-  mutate(npp_modis.gC.m2.d = npp_modis*1000/365, #Century units now same as Millennial
-         param_claysilt = Clay_63um/100, #fraction in Century
-         forc_st = stemp, 
-         forc_sw = sm, 
-         forc_npp = npp_modis.gC.m2.d,
-         LN = LIG_N, 
-         LigFrac = LIG/100,
-         Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
-         input_to_metlitter = 0.85 - 0.013 * LN,
-         site_id = row_number()) %>%
+  dplyr::mutate(npp_modis.gC.m2.d = npp_modis*1000/365, #Century units now same as Millennial
+                param_claysilt = Clay_63um/100, #fraction in Century
+                forc_st = stemp, 
+                forc_sw = sm, 
+                forc_npp = npp_modis.gC.m2.d,
+                LN = LIG_N, 
+                LigFrac = LIG/100,
+                Soil_Organic_Carbon_kg_m2 = CORG*10*bd_extracted*20/100,
+                input_to_metlitter = 0.85 - 0.013 * LN,
+                site_id = row_number()) %>%
   dplyr::select(SSN, forc_st, forc_sw, forc_npp, LN, param_claysilt, LigFrac, 
                 Soil_Organic_Carbon_kg_m2, input_to_metlitter, site_id)
 
@@ -100,7 +90,7 @@ forcing_data_Century <- forcing_data %>%
 #Run Century at AfSIS sites (after Abramoff et al. 2021)
 ```{r}
 # Read in parameters - Described in Table A1 of Abramoff et al. (2021)
-# parameters.file <- read.table(here("parameters/soilpara_in_century.txt")) #default
+parameters.file <- read.table(here("parameters/soilpara_in_century.txt")) #default
 
 #uncomment next two code chunks for fitted
 parameters.MCMC <- read.csv("parameters/Century_MCMC_out_SingleBest_120325.csv") #MCMC fitted

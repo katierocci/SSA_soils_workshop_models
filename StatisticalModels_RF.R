@@ -4,15 +4,9 @@
 
 library(tidyverse)
 library(ggpubr)
-library(RColorBrewer)
 library(mlr3)
 library(mlr3learners)
-library(mlr3viz)
-library(mlr3spatial)
-library(mlr3spatiotempcv) 
 library(iml)
-library(sf)
-library(scales)
 
 # Define color scheme
 colors_models <- c("MIMICS" = "#1b9e77", 
@@ -712,8 +706,8 @@ source_order <- c("Observed", "Fitted")
 
 # Define facet labels columns (data sources)
 facet_labels_sources <- c(
-  Observed = "Observed AfSIS data",
-  Fitted = "Modeled AfSIS data"
+  Observed = "Observed SOC stocks",
+  Fitted = "Modeled SOC stocks"
   # Sensitivity = "Sensitivity Analysis"
 )
 
@@ -748,9 +742,9 @@ comparison_pred_plot <- all_predictions_combined %>%
   theme(axis.text = element_text(color = "black"),
         strip.text = element_text(size = 11, face = "bold"),
         strip.background = element_blank()) +
-  scale_y_continuous("Observed/Modeled SOC stocks [kg/m²]", expand = c(0,0),
+  scale_y_continuous(expression("SOC stocks [kg m" ^-2*"]"), expand = c(0,0),
                      limits = c(-1,45)) +
-  scale_x_continuous("Predicted SOC stocks [kg/m²]", expand = c(0,0),
+  scale_x_continuous(expression("Predicted SOC stocks [kg m" ^-2*"]"), expand = c(0,0),
                      limits = c(-1,30)) +
   # Add metrics as text annotations
   geom_text(data = metrics_for_annotation,
@@ -781,7 +775,7 @@ median_pct_diff <- all_vi_comparison %>%
     values_from = median_pct
   ) %>%
   mutate(median_pct_diff = abs(Fitted - Observed)) %>%
-  select(variable, model, Observed, Fitted, median_pct_diff)
+  dplyr::select(variable, model, Observed, Fitted, median_pct_diff)
 
 median_pct_diff
 
@@ -825,8 +819,8 @@ vi_comparison_plot <- all_vi_comparison %>%
              labeller = labeller(model = facet_labels_models)) +
   scale_fill_manual(values = c("Observed" = "#d8b365",
                                "Fitted" = "#5ab4ac"),
-                    name = "Random forest model trained on: ",
-                    labels = c("observed AfSIS data", "modeled AfSIS data")) +
+                    name = "Random forest models trained on: ",
+                    labels = c("observed SOC stocks", "modeled SOC stocks")) +
   theme_bw(base_size = 15) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, color = "black", 
                                    size = 10),
@@ -857,6 +851,8 @@ pdp_all$data_source <- factor(pdp_all$data_source,
                                 "Fitted" 
                                 # "Sensitivity"
                                 ),
+                              labels = c("observed SOC stocks",
+                                         "modeled SOC stocks"),
                               ordered = TRUE)
 
 #Function to plot PDP for each model
@@ -870,14 +866,14 @@ plot_pdp_all_fun <- function(pdp_data, model_name) {
     theme(axis.text = element_text(color = "black"),
           strip.text = element_text(size = 12, face = "bold"),
           legend.position = "top") +
-    scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
+    scale_y_continuous(expression("Predicted SOC stocks [kg m"^-2*"]"), expand = c(0,0),
                        limits = c(0,20)) +
     scale_x_continuous("Predictor range", expand = c(0,0)) +
-    scale_color_manual(values = c("Observed" = "#d8b365",
-                                  "Fitted" = "#5ab4ac"
+    scale_color_manual(values = c("observed SOC stocks" = "#d8b365",
+                                  "modeled SOC stocks" = "#5ab4ac"
                                   # "Sensitivity" = "#af8dc3"
                                   ),
-                       name = "Random forest model")
+                       name = "Random forest model trained on:")
 }
 
 # Plot PDP's
@@ -893,7 +889,7 @@ plot_pdp_all_fun(pdp_all, "Century")
 ggsave("./figures/RF_all_Century_pdp.jpeg",
        width = 10, height = 6)
 
-#Function to plot PDP for each model - for Cornell talk
+#Function to plot PDP for each model
 p_clay <- pdp_all %>%
   # filter(data_source != "Sensitivity") %>%
   dplyr::filter(feature_name == "Clay_63um"|
@@ -910,11 +906,11 @@ p_clay <- pdp_all %>%
         panel.spacing.x = unit(0.5, "cm"),
         plot.margin = margin(r = 10, b = 10, l = 10),
         axis.title.y = element_blank()) +
-  scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
+  scale_y_continuous(expression("Predicted SOC stocks [kg m"^-2*"]"), expand = c(0,0),
                      limits = c(0,20)) +
   scale_x_continuous("Clay content [%]", expand = c(0,0), limits = c(0,100)) +
-  scale_color_manual(values = c("Observed" = "#d8b365",
-                                "Fitted" = "#5ab4ac"),
+  scale_color_manual(values = c("observed SOC stocks" = "#d8b365",
+                                "modeled SOC stocks" = "#5ab4ac"),
                      name = "Random forest model trained on: ",
                      labels = c("observed AfSIS data", "modeled AfSIS data"))
 
@@ -941,17 +937,18 @@ p_npp <- pdp_all %>%
         panel.spacing.x = unit(0.5, "cm"),
         plot.margin = margin(r = 10, t = 0, l = 10, b = 10),
         axis.title.y = element_blank()) +
-  scale_y_continuous("Predicted SOC stock [kg m-2]", expand = c(0,0),
+  scale_y_continuous(expression("Predicted SOC stocks [kg m"^-2*"]"), expand = c(0,0),
                      limits = c(0,20)) +
-  scale_x_continuous("NPP [gC m-2 d-1]", expand = c(0,0), limits = c(0,6)) +
-  scale_color_manual(values = c("Observed" = "#d8b365",
-                                "Fitted" = "#5ab4ac"),
+  scale_x_continuous(expression("NPP [gC m"^-2*" d"^-1*"]"), 
+                     expand = c(0,0), limits = c(0,6)) +
+  scale_color_manual(values = c("observed SOC stocks" = "#d8b365",
+                                "modeled SOC stocks" = "#5ab4ac"),
                      name = "Random forest model trained on: ",
                      labels = c("observed AfSIS data", "modeled AfSIS data"))
 
 annotate_figure(
   ggarrange(p_clay, p_npp, common.legend = TRUE, nrow = 2, heights = c(1.1,1)),
-  left = text_grob("Predicted SOC stock [kg m-2]",
+  left = text_grob(expression("Predicted SOC stocks [kg m"^-2*"]"),
                    rot = 90, vjust = 1, hjust = 0.5))
 ggsave("./figures/RF_Century_MIMICS_Millennial_pdp_red.jpeg",
        height = 6, width = 9)
